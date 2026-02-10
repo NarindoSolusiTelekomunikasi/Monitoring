@@ -1,0 +1,42 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="UTF-8" />
+  <title>Narindo</title>
+  <style>
+    body { font-family: Arial; padding: 20px; }
+    table { border-collapse: collapse; width: 100%; }
+    th, td { border: 1px solid #ccc; padding: 6px; text-align: center; }
+    th { background: #f4f4f4; }
+  </style>
+</head>
+<body>
+
+<h2>🏆 Ranking Team</h2>
+<table id="ranking"></table>
+
+<script>
+const API = 'https://script.google.com/macros/s/AKfycbwR_Mkb5i2Du3uNM6Otm50iftyfwvP1OQ9tsM_-2rsny4VjV5HhY-1O8Tgz0eOnf44/exec';
+
+fetch(API + '?action=ranking_team')
+  .then(res => res.json())
+  .then(data => {
+    const table = document.getElementById('ranking');
+
+    const headers = Object.keys(data[0]);
+    table.innerHTML =
+      '<tr>' + headers.map(h => `<th>${h}</th>`).join('') + '</tr>' +
+      data.map(row =>
+        '<tr>' +
+        headers.map(h => `<td>${row[h]}</td>`).join('') +
+        '</tr>'
+      ).join('');
+  })
+  .catch(err => {
+    document.body.innerHTML += '<p>❌ Gagal load data</p>';
+    console.error(err);
+  });
+</script>
+
+</body>
+</html>
