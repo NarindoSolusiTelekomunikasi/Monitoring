@@ -1,4 +1,4 @@
-const API_URL = "PASTE_API_URL_DISINI";
+const API_URL = "https://script.google.com/macros/s/AKfycbwNprTADvMXpSlMrcg5YYl6-cp5kxMhrqK6BEVBV9sKe6LHliaYjbPNea8FR4sBBCBP3A/exec";
 
 fetch(API_URL)
 .then(res=>res.json())
