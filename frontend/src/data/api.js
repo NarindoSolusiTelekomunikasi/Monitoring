@@ -1,7 +1,21 @@
 const API_BASE_URL = String(import.meta.env.VITE_API_BASE_URL ?? '').trim().replace(/\/+$/, '')
+const API_STYLE = String(import.meta.env.VITE_API_STYLE ?? 'rest').trim().toLowerCase()
 const API_PREFIX = String(import.meta.env.VITE_API_PREFIX ?? '/api').trim()
 
 function buildUrl(path, params) {
+  if (API_STYLE === 'apps-script') {
+    const query = new URLSearchParams()
+    query.set('route', String(path).replace(/^\/+/, ''))
+    Object.entries(params ?? {}).forEach(([key, value]) => {
+      if (value == null || value === '' || value === 'all') {
+        return
+      }
+      query.set(key, value)
+    })
+    const separator = API_BASE_URL.includes('?') ? '&' : '?'
+    return `${API_BASE_URL}${separator}${query.toString()}`
+  }
+
   const normalizedPath = `${API_PREFIX}/${String(path).replace(/^\/+/, '')}`.replace(/\/{2,}/g, '/')
   const base = API_BASE_URL || ''
   return `${base}${normalizedPath}${toQueryString(params)}`
@@ -22,10 +36,6 @@ function toQueryString(params) {
 async function fetchJson(path, params) {
   const response = await fetch(buildUrl(path, params), {
     cache: 'no-store',
-    headers: {
-      'Cache-Control': 'no-cache',
-      Pragma: 'no-cache',
-    },
   })
   if (!response.ok) {
     const payload = await response.json().catch(() => ({}))

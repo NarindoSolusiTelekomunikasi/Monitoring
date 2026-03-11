@@ -1,0 +1,764 @@
+const CONFIG = {
+  spreadsheetId:
+    PropertiesService.getScriptProperties().getProperty('SPREADSHEET_ID') ||
+    '1xKFr7vfaEltmSJu6UAodKBqk-fdST8I9vEU-fyC1xLM',
+}
+
+const SHEET_CONFIG = {
+  DATABASE_RAW: { headerRow: 0 },
+  TEAM_MASTER: { headerRow: 0 },
+  TEAM_PERFORMANCE: { headerRow: 0 },
+  STO_COMMAND_CENTER: { headerRow: 0 },
+  RANKING_TEAM: { headerRow: 0 },
+  RANKING_TEKNISI: { headerRow: 0 },
+  IMJAS: { headerRow: 1 },
+  UNSPEC: { headerRow: 1 },
+}
+
+const FILTER_DATE_RANGES = {
+  today: 0,
+  '7d': 7,
+  '30d': 30,
+}
+
+const STATUS_OPTIONS = ['OPEN', 'CLOSE SYSTEM', 'CLOSE HD', 'CLOSE MYI']
+
+function doGet(e) {
+  try {
+    const route = getRoute(e)
+    const normalizedRoute = route.toLowerCase()
+    const filters = getFilters(e)
+    let payload
+
+    switch (normalizedRoute) {
+      case 'health':
+        payload = Object.assign({ ok: true }, getHealthData())
+        break
+      case 'dashboard':
+        payload = Object.assign({ filters: getFilterOptions() }, getDashboardData(filters))
+        break
+      case 'tickets':
+        payload = (function () {
+          const items = getTicketData(filters)
+          return {
+            filters: getFilterOptions(),
+            total: items.length,
+            items: items,
+          }
+        })()
+        break
+      case 'teams':
+        payload = Object.assign({ filters: getFilterOptions() }, getTeamData(filters))
+        break
+      case 'rankings/teams':
+        payload = {
+          filters: getFilterOptions(),
+          items: getRankedTeams(filters),
+        }
+        break
+      case 'rankings/technicians':
+        payload = {
+          filters: getFilterOptions(),
+          items: getRankedTechnicians(filters),
+        }
+        break
+      case 'imjas':
+        payload = Object.assign({ filters: getFilterOptions() }, getImjasData(filters))
+        break
+      case 'unspec':
+        payload = Object.assign({ filters: getFilterOptions() }, getUnspecData(filters))
+        break
+      default:
+        if (normalizedRoute.indexOf('tickets/') === 0) {
+          const incidentId = route.split('/').slice(1).join('/')
+          const ticket = getTicketByIncident(incidentId)
+          payload = ticket || {
+            error: 'not_found',
+            message: 'Ticket ' + incidentId + ' was not found.',
+          }
+        } else {
+          payload = {
+            error: 'not_found',
+            message: 'Route ' + route + ' is not supported.',
+          }
+        }
+        break
+    }
+
+    return jsonOutput(payload)
+  } catch (error) {
+    return jsonOutput({
+      error: 'internal_error',
+      message: error.message,
+    })
+  }
+}
+
+function getRoute(e) {
+  const routeParam = normalizeText(e && e.parameter ? e.parameter.route : '')
+  const pathInfo = normalizeText(e && e.pathInfo ? e.pathInfo : '')
+  const route = routeParam || pathInfo || 'dashboard'
+  return route.replace(/^\/+|\/+$/g, '')
+}
+
+function getFilters(e) {
+  return e && e.parameter ? e.parameter : {}
+}
+
+function jsonOutput(payload) {
+  return ContentService.createTextOutput(JSON.stringify(payload)).setMimeType(ContentService.MimeType.JSON)
+}
+
+function getSpreadsheet() {
+  return SpreadsheetApp.openById(CONFIG.spreadsheetId)
+}
+
+function getSheetBundle(spreadsheet, sheetName) {
+  const sheet = spreadsheet.getSheetByName(sheetName)
+  if (!sheet) {
+    throw new Error('Sheet ' + sheetName + ' was not found in spreadsheet.')
+  }
+  const range = sheet.getDataRange()
+  return {
+    displayRows: range.getDisplayValues(),
+    rawRows: range.getValues(),
+  }
+}
+
+function normalizeText(value) {
+  return String(value == null ? '' : value).replace(/\s+/g, ' ').trim()
+}
+
+function normalizeKey(value) {
+  return normalizeText(value)
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, '_')
+    .replace(/^_|_$/g, '')
+}
+
+function toNumber(value) {
+  if (value === '' || value == null) return 0
+  const numeric = Number(String(value).replace(/,/g, '.'))
+  return Number.isFinite(numeric) ? numeric : 0
+}
+
+function toNullableText(value) {
+  const normalized = normalizeText(value)
+  return normalized || null
+}
+
+function normalizeStatus(value) {
+  const normalized = normalizeText(value).toUpperCase()
+  if (!normalized) return ''
+  if (normalized.indexOf('CLOSE') !== 0) return normalized
+  if (normalized.indexOf('MYI') >= 0) return 'CLOSE MYI'
+  if (normalized.indexOf('HD') >= 0) return 'CLOSE HD'
+  if (normalized.indexOf('SYSTEM') >= 0 || normalized === 'CLOSE') return 'CLOSE SYSTEM'
+  return normalized
+}
+
+function isClosedStatus(value) {
+  return normalizeStatus(value).indexOf('CLOSE') === 0
+}
+
+function parseSheetDate(rawValue, displayValue) {
+  if (Object.prototype.toString.call(rawValue) === '[object Date]' && !Number.isNaN(rawValue.getTime())) {
+    return rawValue.toISOString()
+  }
+
+  const numeric = Number(rawValue)
+  if (String(rawValue) !== '' && Number.isFinite(numeric)) {
+    return excelSerialToIso(numeric)
+  }
+
+  return parseWorkbookDateText(displayValue)
+}
+
+function excelSerialToIso(value) {
+  const numeric = Number(value)
+  if (!Number.isFinite(numeric)) {
+    const parsed = new Date(value)
+    return Number.isNaN(parsed.getTime()) ? null : parsed.toISOString()
+  }
+
+  const utcDays = Math.floor(numeric - 25569)
+  const utcValue = utcDays * 86400
+  const dateInfo = new Date(utcValue * 1000)
+  const fractionalDay = numeric - Math.floor(numeric) + 0.0000001
+  let totalSeconds = Math.floor(86400 * fractionalDay)
+  const seconds = totalSeconds % 60
+  totalSeconds -= seconds
+  const hours = Math.floor(totalSeconds / 3600)
+  const minutes = Math.floor(totalSeconds / 60) % 60
+  dateInfo.setUTCHours(hours)
+  dateInfo.setUTCMinutes(minutes)
+  dateInfo.setUTCSeconds(seconds)
+  return dateInfo.toISOString()
+}
+
+function parseWorkbookDateText(value) {
+  const text = normalizeText(value)
+  const match = text.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/)
+  if (match) {
+    const first = Number(match[1])
+    const second = Number(match[2])
+    const year = Number(match[3])
+    const candidates = []
+
+    if (first > 12 && second <= 12) {
+      candidates.push({ day: first, month: second })
+    } else if (second > 12 && first <= 12) {
+      candidates.push({ day: second, month: first })
+    } else {
+      candidates.push({ day: first, month: second })
+      candidates.push({ day: second, month: first })
+    }
+
+    for (let index = 0; index < candidates.length; index += 1) {
+      const candidate = candidates[index]
+      const parsed = new Date(Date.UTC(year, candidate.month - 1, candidate.day))
+      if (!Number.isNaN(parsed.getTime())) {
+        return parsed.toISOString()
+      }
+    }
+  }
+
+  const parsed = new Date(text)
+  return Number.isNaN(parsed.getTime()) ? null : parsed.toISOString()
+}
+
+function getDatabaseRawRows(spreadsheet) {
+  const bundle = getSheetBundle(spreadsheet, 'DATABASE_RAW')
+  const rows = []
+
+  for (let rowIndex = 1; rowIndex < bundle.displayRows.length; rowIndex += 1) {
+    const displayRow = bundle.displayRows[rowIndex]
+    const rawRow = bundle.rawRows[rowIndex]
+    const incident = normalizeText(displayRow[0])
+    if (!incident || incident === 'INCIDENT') {
+      continue
+    }
+
+    rows.push({
+      incident: incident,
+      summary: normalizeText(displayRow[1]),
+      serviceType: normalizeText(displayRow[2]),
+      sto: normalizeText(displayRow[3]),
+      workzone: normalizeText(displayRow[3]),
+      contactPhone: normalizeText(displayRow[4]),
+      contactName: normalizeText(displayRow[5]),
+      customerType: normalizeText(displayRow[6]),
+      serviceNo: normalizeText(displayRow[7]),
+      deviceName: normalizeText(displayRow[8]),
+      helpdesk: normalizeText(displayRow[9]),
+      jenisTiket: normalizeText(displayRow[10]),
+      status: normalizeStatus(displayRow[11]),
+      teknisiRaw: normalizeText(displayRow[12]),
+      tanggal: parseSheetDate(rawRow[13], displayRow[13]),
+    })
+  }
+
+  return rows
+}
+
+function mapSheetObjects(spreadsheet, sheetName) {
+  const bundle = getSheetBundle(spreadsheet, sheetName)
+  const headerRow = SHEET_CONFIG[sheetName] ? SHEET_CONFIG[sheetName].headerRow : 0
+  const headers = bundle.displayRows[headerRow].map(function (value) {
+    return normalizeKey(value)
+  })
+
+  return bundle.displayRows
+    .slice(headerRow + 1)
+    .filter(function (row) {
+      return row.some(function (cell) {
+        return normalizeText(cell)
+      })
+    })
+    .map(function (row) {
+      const item = {}
+      headers.forEach(function (header, index) {
+        item[header] = row[index] || ''
+      })
+      return item
+    })
+}
+
+function technicianDisplayName(value) {
+  return normalizeText(value).split('/')[0].trim()
+}
+
+function buildTeamLookup(teamMasterRows) {
+  const lookup = new Map()
+  teamMasterRows.forEach(function (row) {
+    const teamName = normalizeText(row.nama_team)
+    const sto = normalizeText(row.sto)
+    ;[row.teknisi_1, row.teknisi_2]
+      .map(technicianDisplayName)
+      .filter(Boolean)
+      .forEach(function (name) {
+        lookup.set(name.toUpperCase(), {
+          team: teamName,
+          sto: sto,
+        })
+      })
+  })
+  return lookup
+}
+
+function loadSpreadsheetData() {
+  const spreadsheet = getSpreadsheet()
+  const teamMaster = mapSheetObjects(spreadsheet, 'TEAM_MASTER')
+  const teamLookup = buildTeamLookup(teamMaster)
+  const rawTickets = getDatabaseRawRows(spreadsheet).map(function (row) {
+    const technicianName = technicianDisplayName(row.teknisiRaw)
+    const teamInfo = teamLookup.get(technicianName.toUpperCase()) || null
+    return {
+      incident: row.incident,
+      summary: row.summary,
+      serviceType: row.serviceType,
+      sto: row.sto,
+      workzone: row.workzone,
+      contactPhone: row.contactPhone,
+      contactName: row.contactName,
+      customerType: row.customerType,
+      serviceNo: row.serviceNo,
+      deviceName: row.deviceName,
+      helpdesk: row.helpdesk,
+      jenisTiket: row.jenisTiket,
+      status: row.status,
+      teknisi: technicianName,
+      teknisiRaw: row.teknisiRaw,
+      team: teamInfo ? teamInfo.team : null,
+      tanggal: row.tanggal,
+    }
+  })
+
+  const teamPerformance = mapSheetObjects(spreadsheet, 'TEAM_PERFORMANCE').map(function (row) {
+    return {
+      sto: normalizeText(row.sto),
+      team: normalizeText(row.team),
+      openReguler: toNumber(row.open_reguler),
+      openSqm: toNumber(row.open_sqm),
+      closeReguler: toNumber(row.close_reguler),
+      closeSqm: toNumber(row.close_sqm),
+      totalOpen: toNumber(row.total_open),
+      totalClose: toNumber(row.total_close),
+    }
+  })
+
+  const stoCommandCenter = mapSheetObjects(spreadsheet, 'STO_COMMAND_CENTER').map(function (row) {
+    return {
+      sto: normalizeText(row.sto),
+      team: normalizeText(row.team),
+      openReg: toNumber(row.open_reg),
+      openSqm: toNumber(row.open_sqm),
+      closeReg: toNumber(row.close_reg),
+      closeSqm: toNumber(row.close_sqm),
+      totalOpen: toNumber(row.total_open),
+      totalClose: toNumber(row.total_close),
+      productivity: toNumber(row.productivity),
+    }
+  })
+
+  const rankingTeams = mapSheetObjects(spreadsheet, 'RANKING_TEAM').map(function (row) {
+    return {
+      rank: toNumber(row.rank),
+      team: normalizeText(row.team),
+      closeReg: toNumber(row.close_reg),
+      closeSqm: toNumber(row.close_sqm),
+      totalClose: toNumber(row.total_close),
+    }
+  })
+
+  const rankingTechnicians = mapSheetObjects(spreadsheet, 'RANKING_TEKNISI').map(function (row) {
+    return {
+      rank: toNumber(row.rank),
+      teknisi: normalizeText(row.teknisi),
+      closeReg: toNumber(row.close_reg),
+      closeSqm: toNumber(row.close_sqm),
+      totalClose: toNumber(row.total_close),
+    }
+  })
+
+  const imjas = mapSheetObjects(spreadsheet, 'IMJAS').map(function (row) {
+    return {
+      sto: normalizeText(row.sto),
+      team: normalizeText(row.team),
+      ixsaOdp: toNumber(row.ixsa_odp),
+      ixsaOdc: toNumber(row.ixsa_odc),
+      validasiTiang: toNullableText(row.validasi_tiang),
+    }
+  })
+
+  const unspec = mapSheetObjects(spreadsheet, 'UNSPEC').map(function (row) {
+    return {
+      sto: normalizeText(row.sto),
+      team: normalizeText(row.team),
+      openUnspec: toNumber(row.open_unspec),
+      closeUnspec: toNumber(row.close_unspec),
+      sisaUnspec: toNumber(row.sisa_unspec),
+      kendala: toNullableText(row.kendala),
+    }
+  })
+
+  return {
+    teamMaster: teamMaster,
+    rawTickets: rawTickets,
+    teamPerformance: teamPerformance,
+    stoCommandCenter: stoCommandCenter,
+    rankingTeams: rankingTeams,
+    rankingTechnicians: rankingTechnicians,
+    imjas: imjas,
+    unspec: unspec,
+  }
+}
+
+function matchesDate(ticketDate, filters) {
+  if (!ticketDate) return !filters.dateFrom && !filters.dateTo && !filters.dateRange
+
+  const date = new Date(ticketDate)
+  if (filters.dateFrom && date < new Date(filters.dateFrom)) return false
+  if (filters.dateTo && date > new Date(filters.dateTo)) return false
+
+  if (filters.dateRange && filters.dateRange !== 'all') {
+    const days = FILTER_DATE_RANGES[filters.dateRange]
+    if (days != null) {
+      const now = new Date()
+      const diff = (now.getTime() - date.getTime()) / (1000 * 60 * 60 * 24)
+      if (diff > days) return false
+    }
+  }
+
+  return true
+}
+
+function matchesQuery(value, query) {
+  return normalizeText(value).toLowerCase().indexOf(normalizeText(query).toLowerCase()) >= 0
+}
+
+function filterByCommonFields(items, filters, searchableFields) {
+  const query = filters.search || ''
+  return items.filter(function (item) {
+    const stoMatches = !filters.sto || filters.sto === 'all' || item.sto === filters.sto || item.workzone === filters.sto
+    const teamMatches = !filters.team || filters.team === 'all' || item.team === filters.team
+    const teknisiMatches =
+      !filters.teknisi ||
+      filters.teknisi === 'all' ||
+      !Object.prototype.hasOwnProperty.call(item, 'teknisi') ||
+      item.teknisi === filters.teknisi ||
+      item.technician === filters.teknisi
+    const statusMatches =
+      !filters.status || filters.status === 'all' || !Object.prototype.hasOwnProperty.call(item, 'status') || item.status === filters.status
+    const serviceMatches =
+      !filters.serviceType ||
+      filters.serviceType === 'all' ||
+      !Object.prototype.hasOwnProperty.call(item, 'serviceType') ||
+      item.serviceType === filters.serviceType ||
+      item.service === filters.serviceType
+    const queryMatches =
+      !query ||
+      searchableFields.some(function (field) {
+        return matchesQuery(item[field], query)
+      })
+
+    return stoMatches && teamMatches && teknisiMatches && statusMatches && serviceMatches && queryMatches
+  })
+}
+
+function summarizeTickets(tickets) {
+  const totalsBySto = new Map()
+
+  tickets.forEach(function (ticket) {
+    const current = totalsBySto.get(ticket.sto) || { sto: ticket.sto, open: 0, close: 0, total: 0 }
+    current.total += 1
+    if (isClosedStatus(ticket.status)) {
+      current.close += 1
+    } else {
+      current.open += 1
+    }
+    totalsBySto.set(ticket.sto, current)
+  })
+
+  const totalTickets = tickets.length
+  const closeTickets = tickets.filter(function (ticket) {
+    return isClosedStatus(ticket.status)
+  }).length
+  const openTickets = totalTickets - closeTickets
+  const activeTechnicians = new Set(
+    tickets
+      .map(function (ticket) {
+        return ticket.teknisi
+      })
+      .filter(Boolean),
+  ).size
+
+  return {
+    kpis: {
+      totalTickets: totalTickets,
+      openTickets: openTickets,
+      closeTickets: closeTickets,
+      activeTechnicians: activeTechnicians,
+      closeRate: totalTickets ? Math.round((closeTickets / totalTickets) * 100) : 0,
+    },
+    stoSummary: Array.from(totalsBySto.values()).sort(function (left, right) {
+      return left.sto.localeCompare(right.sto)
+    }),
+  }
+}
+
+function summarizeTeams(tickets) {
+  const teamMap = new Map()
+  const technicianMap = new Map()
+
+  tickets.forEach(function (ticket) {
+    if (ticket.teknisi) {
+      const tech = technicianMap.get(ticket.teknisi) || {
+        teknisi: ticket.teknisi,
+        sto: ticket.sto,
+        team: ticket.team,
+        total: 0,
+        open: 0,
+        close: 0,
+      }
+      tech.total += 1
+      if (isClosedStatus(ticket.status)) {
+        tech.close += 1
+      } else {
+        tech.open += 1
+      }
+      technicianMap.set(ticket.teknisi, tech)
+    }
+
+    if (ticket.team) {
+      const team = teamMap.get(ticket.team) || {
+        team: ticket.team,
+        sto: ticket.sto,
+        total: 0,
+        open: 0,
+        close: 0,
+      }
+      team.total += 1
+      if (isClosedStatus(ticket.status)) {
+        team.close += 1
+      } else {
+        team.open += 1
+      }
+      teamMap.set(ticket.team, team)
+    }
+  })
+
+  const technicians = Array.from(technicianMap.values())
+    .map(function (item) {
+      return Object.assign({}, item, {
+        productivity: item.total ? Math.round((item.close / item.total) * 100) : 0,
+      })
+    })
+    .sort(function (left, right) {
+      return right.close - left.close || right.productivity - left.productivity
+    })
+
+  const teams = Array.from(teamMap.values())
+    .map(function (item) {
+      return Object.assign({}, item, {
+        productivity: item.total ? Math.round((item.close / item.total) * 100) : 0,
+        topPerformer:
+          (technicians.find(function (tech) {
+            return tech.team === item.team
+          }) || {}).teknisi || null,
+      })
+    })
+    .sort(function (left, right) {
+      return right.close - left.close || right.productivity - left.productivity
+    })
+
+  return {
+    teams: teams,
+    technicians: technicians,
+  }
+}
+
+function getHealthData() {
+  const data = loadSpreadsheetData()
+  return {
+    workbook: 'google-sheet-live',
+    source: {
+      type: 'google-apps-script',
+      spreadsheetId: CONFIG.spreadsheetId,
+    },
+    sheets: Object.keys(SHEET_CONFIG),
+    counts: {
+      rawTickets: data.rawTickets.length,
+      teamMaster: data.teamMaster.length,
+      imjas: data.imjas.length,
+      unspec: data.unspec.length,
+    },
+  }
+}
+
+function getFilterOptions() {
+  const data = loadSpreadsheetData()
+  return {
+    dateRanges: [
+      { value: 'all', label: 'Semua tanggal' },
+      { value: 'today', label: 'Hari ini' },
+      { value: '7d', label: '7 hari terakhir' },
+      { value: '30d', label: '30 hari terakhir' },
+    ],
+    stos: Array.from(
+      new Set(
+        data.rawTickets
+          .map(function (ticket) {
+            return ticket.sto
+          })
+          .filter(Boolean),
+      ),
+    ).sort(),
+    teams: Array.from(
+      new Set(
+        data.teamMaster
+          .map(function (item) {
+            return normalizeText(item.nama_team)
+          })
+          .filter(Boolean),
+      ),
+    ).sort(),
+    teknisis: Array.from(
+      new Set(
+        data.rawTickets
+          .map(function (ticket) {
+            return ticket.teknisi
+          })
+          .filter(Boolean),
+      ),
+    ).sort(),
+    statuses: STATUS_OPTIONS,
+    serviceTypes: Array.from(
+      new Set(
+        data.rawTickets
+          .map(function (ticket) {
+            return ticket.serviceType
+          })
+          .filter(Boolean),
+      ),
+    ).sort(),
+  }
+}
+
+function getDashboardData(filters) {
+  const data = loadSpreadsheetData()
+  const filteredTickets = filterByCommonFields(
+    data.rawTickets.filter(function (ticket) {
+      return matchesDate(ticket.tanggal, filters)
+    }),
+    filters,
+    ['incident', 'summary', 'contactName', 'teknisi', 'serviceType', 'sto'],
+  )
+  const summary = summarizeTickets(filteredTickets)
+  const teamSummary = summarizeTeams(filteredTickets)
+
+  return {
+    generatedAt: new Date().toISOString(),
+    kpis: summary.kpis,
+    stoSummary: summary.stoSummary,
+    topTeams: teamSummary.teams.slice(0, 6),
+    topTechnicians: teamSummary.technicians.slice(0, 6),
+  }
+}
+
+function getTicketData(filters) {
+  const data = loadSpreadsheetData()
+  return filterByCommonFields(
+    data.rawTickets.filter(function (ticket) {
+      return matchesDate(ticket.tanggal, filters)
+    }),
+    filters,
+    ['incident', 'summary', 'contactName', 'teknisi', 'serviceType', 'sto'],
+  ).sort(function (left, right) {
+    const leftTime = left.tanggal ? new Date(left.tanggal).getTime() : 0
+    const rightTime = right.tanggal ? new Date(right.tanggal).getTime() : 0
+    return rightTime - leftTime
+  })
+}
+
+function getTicketByIncident(incidentId) {
+  const data = loadSpreadsheetData()
+  return (
+    data.rawTickets.find(function (ticket) {
+      return ticket.incident === incidentId
+    }) || null
+  )
+}
+
+function getTeamData(filters) {
+  const data = loadSpreadsheetData()
+  const filteredTickets = filterByCommonFields(
+    data.rawTickets.filter(function (ticket) {
+      return matchesDate(ticket.tanggal, filters)
+    }),
+    filters,
+    ['incident', 'summary', 'contactName', 'teknisi', 'serviceType', 'sto'],
+  )
+  const summary = summarizeTeams(filteredTickets)
+  return {
+    teams: summary.teams,
+    technicians: summary.technicians,
+    commandCenter: filterByCommonFields(data.stoCommandCenter, filters, ['sto', 'team']),
+    teamPerformance: filterByCommonFields(data.teamPerformance, filters, ['sto', 'team']),
+  }
+}
+
+function getRankedTeams(filters) {
+  const data = loadSpreadsheetData()
+  return filterByCommonFields(data.rankingTeams, filters, ['team', 'sto'])
+}
+
+function getRankedTechnicians(filters) {
+  const data = loadSpreadsheetData()
+  return filterByCommonFields(data.rankingTechnicians, filters, ['teknisi'])
+}
+
+function summarizeImjas(items) {
+  return {
+    totalTeams: items.length,
+    totalIxsaOdp: items.reduce(function (sum, item) {
+      return sum + item.ixsaOdp
+    }, 0),
+    totalIxsaOdc: items.reduce(function (sum, item) {
+      return sum + item.ixsaOdc
+    }, 0),
+  }
+}
+
+function summarizeUnspec(items) {
+  return {
+    totalTeams: items.length,
+    totalOpen: items.reduce(function (sum, item) {
+      return sum + item.openUnspec
+    }, 0),
+    totalClose: items.reduce(function (sum, item) {
+      return sum + item.closeUnspec
+    }, 0),
+    totalRemaining: items.reduce(function (sum, item) {
+      return sum + item.sisaUnspec
+    }, 0),
+  }
+}
+
+function getImjasData(filters) {
+  const data = loadSpreadsheetData()
+  const items = filterByCommonFields(data.imjas, filters, ['sto', 'team'])
+  return {
+    summary: summarizeImjas(items),
+    items: items,
+  }
+}
+
+function getUnspecData(filters) {
+  const data = loadSpreadsheetData()
+  const items = filterByCommonFields(data.unspec, filters, ['sto', 'team', 'kendala'])
+  return {
+    summary: summarizeUnspec(items),
+    items: items,
+  }
+}
