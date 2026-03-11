@@ -30,7 +30,8 @@ let RUNTIME_FILTER_OPTIONS = null
 function doGet(e) {
   try {
     const route = getRoute(e)
-    const normalizedRoute = route.toLowerCase()
+    const normalizedRoute = route.toLowerCase()git add .
+
     const filters = getFilters(e)
     const cacheKey = buildRouteCacheKey(normalizedRoute, filters)
     if (shouldUseRouteCache(normalizedRoute)) {
@@ -548,10 +549,24 @@ function matchesQuery(value, query) {
   return normalizeText(value).toLowerCase().indexOf(normalizeText(query).toLowerCase()) >= 0
 }
 
+function parseFilterValues(value) {
+  const normalized = normalizeText(value)
+  if (!normalized || normalized === 'all') {
+    return []
+  }
+  return normalized
+    .split(',')
+    .map(function (item) {
+      return normalizeText(item)
+    })
+    .filter(Boolean)
+}
+
 function filterByCommonFields(items, filters, searchableFields) {
   const query = filters.search || ''
+  const selectedStos = parseFilterValues(filters.sto)
   return items.filter(function (item) {
-    const stoMatches = !filters.sto || filters.sto === 'all' || item.sto === filters.sto || item.workzone === filters.sto
+    const stoMatches = selectedStos.length === 0 || selectedStos.indexOf(item.sto) >= 0 || selectedStos.indexOf(item.workzone) >= 0
     const teamMatches = !filters.team || filters.team === 'all' || item.team === filters.team
     const teknisiMatches =
       !filters.teknisi ||

@@ -1,3 +1,4 @@
+import { useMemo } from 'react'
 import { useDashboard } from '../context/DashboardContext'
 
 const allLabels = {
@@ -9,6 +10,30 @@ const allLabels = {
 }
 
 const REQUIRED_STATUS_OPTIONS = ['OPEN', 'CLOSE SYSTEM', 'CLOSE HD', 'CLOSE MYI']
+
+function parseMultiValue(value) {
+  if (!value || value === 'all') {
+    return []
+  }
+  return value
+    .split(',')
+    .map((item) => item.trim())
+    .filter(Boolean)
+}
+
+function stringifyMultiValue(values) {
+  return values.length ? values.join(',') : 'all'
+}
+
+function formatMultiValueLabel(values) {
+  if (!values.length) {
+    return 'Semua STO'
+  }
+  if (values.length <= 2) {
+    return values.join(', ')
+  }
+  return `${values.slice(0, 2).join(', ')} +${values.length - 2}`
+}
 
 function FilterSelect({ label, value, options, onChange }) {
   return (
@@ -31,9 +56,42 @@ function FilterSelect({ label, value, options, onChange }) {
   )
 }
 
+function StoMultiSelect({ value, options, onChange }) {
+  const selectedValues = parseMultiValue(value)
+  const stoOptions = options.filter((option) => option !== 'all')
+
+  const toggleValue = (sto) => {
+    const nextValues = selectedValues.includes(sto)
+      ? selectedValues.filter((item) => item !== sto)
+      : [...selectedValues, sto]
+    onChange(stringifyMultiValue(nextValues))
+  }
+
+  return (
+    <div className="filter-select">
+      <span>STO</span>
+      <details className="multi-select">
+        <summary>{formatMultiValueLabel(selectedValues)}</summary>
+        <div className="multi-select__menu">
+          <button type="button" className="multi-select__action" onClick={() => onChange('all')}>
+            Pilih semua STO
+          </button>
+          {stoOptions.map((option) => (
+            <label key={option} className="multi-select__option">
+              <input type="checkbox" checked={selectedValues.includes(option)} onChange={() => toggleValue(option)} />
+              <span>{option}</span>
+            </label>
+          ))}
+        </div>
+      </details>
+    </div>
+  )
+}
+
 function FilterBar({ title, description, options }) {
   const { state, setFilter, resetFilters } = useDashboard()
   const statusOptions = ['all', ...new Set([...(options.statuses ?? []), ...REQUIRED_STATUS_OPTIONS])]
+  const stoOptions = useMemo(() => ['all', ...(options.stos ?? [])], [options.stos])
 
   return (
     <section className="filter-bar panel">
@@ -50,12 +108,7 @@ function FilterBar({ title, description, options }) {
           options={options.dateRanges ?? [{ value: 'all', label: 'Semua tanggal' }]}
           onChange={(event) => setFilter('dateRange', event.target.value)}
         />
-        <FilterSelect
-          label="STO"
-          value={state.filters.sto}
-          options={['all', ...(options.stos ?? [])]}
-          onChange={(event) => setFilter('sto', event.target.value)}
-        />
+        <StoMultiSelect value={state.filters.sto} options={stoOptions} onChange={(value) => setFilter('sto', value)} />
         <FilterSelect
           label="Team"
           value={state.filters.team}

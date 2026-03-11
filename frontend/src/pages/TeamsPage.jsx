@@ -27,7 +27,7 @@ function TeamsPage() {
   )
 
   if (loading && !data) {
-    return <MessageBlock title="Memuat team performance" message="Mengambil rangkuman team dan teknisi dari backend spreadsheet." />
+    return <MessageBlock title="Memuat team performance" message="Tunggu yee gilang lagi beken kopi." />
   }
 
   if (error) {
