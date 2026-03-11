@@ -226,6 +226,9 @@ p {
 }
 
 .filter-bar {
+  position: relative;
+  z-index: 12;
+  overflow: visible;
   display: grid;
   grid-template-columns: minmax(260px, 1fr) minmax(0, 2fr) auto;
   gap: 18px;
@@ -255,12 +258,15 @@ p {
 }
 
 .filter-bar__controls {
+  position: relative;
+  z-index: 13;
   display: grid;
   grid-template-columns: repeat(6, minmax(0, 1fr));
   gap: 12px;
 }
 
 .filter-select {
+  position: relative;
   display: flex;
   flex-direction: column;
   gap: 8px;
@@ -311,7 +317,7 @@ p {
 
 .multi-select__menu {
   position: absolute;
-  z-index: 30;
+  z-index: 60;
   top: calc(100% + 8px);
   left: 0;
   width: 100%;
