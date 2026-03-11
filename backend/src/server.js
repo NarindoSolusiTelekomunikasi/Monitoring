@@ -55,6 +55,13 @@ app.get(
 )
 
 app.get(
+  '/api/filters',
+  handleRequest(async () => ({
+    filters: await getFilterOptions(),
+  })),
+)
+
+app.get(
   '/api/dashboard',
   handleRequest(async (req) => {
     const filters = req.query

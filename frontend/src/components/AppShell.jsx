@@ -1,7 +1,7 @@
-﻿import { useMemo } from 'react'
+import { useMemo } from 'react'
 import { Outlet, useLocation } from 'react-router-dom'
 import { useDashboard } from '../context/DashboardContext'
-import { getDashboard } from '../data/api'
+import { getFilters } from '../data/api'
 import useApiResource from '../hooks/useApiResource'
 import FilterBar from './FilterBar'
 import Sidebar from './Sidebar'
@@ -42,17 +42,7 @@ function AppShell() {
   const location = useLocation()
   const { state, toggleMobileNav, closeMobileNav, resetFilters } = useDashboard()
   const meta = pageMeta[location.pathname] ?? pageMeta['/']
-  const { data } = useApiResource(
-    () => getDashboard(state.filters),
-    [
-      state.filters.dateRange,
-      state.filters.sto,
-      state.filters.team,
-      state.filters.status,
-      state.filters.serviceType,
-      state.filters.teknisi,
-    ],
-  )
+  const { data } = useApiResource(() => getFilters(), [], { refreshMs: 300000 })
 
   const activeFilters = useMemo(
     () =>

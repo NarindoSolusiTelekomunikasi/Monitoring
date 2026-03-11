@@ -48,6 +48,10 @@ export function getDashboard(filters) {
   return fetchJson('/dashboard', filters)
 }
 
+export function getFilters() {
+  return fetchJson('/filters')
+}
+
 export function getTickets(filters) {
   return fetchJson('/tickets', filters)
 }

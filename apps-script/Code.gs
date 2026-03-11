@@ -2,6 +2,8 @@ const CONFIG = {
   spreadsheetId:
     PropertiesService.getScriptProperties().getProperty('SPREADSHEET_ID') ||
     '1xKFr7vfaEltmSJu6UAodKBqk-fdST8I9vEU-fyC1xLM',
+  cacheTtlSeconds: 60,
+  filtersCacheTtlSeconds: 300,
 }
 
 const SHEET_CONFIG = {
@@ -11,8 +13,8 @@ const SHEET_CONFIG = {
   STO_COMMAND_CENTER: { headerRow: 0 },
   RANKING_TEAM: { headerRow: 0 },
   RANKING_TEKNISI: { headerRow: 0 },
-  IMJAS: { headerRow: 1 },
-  UNSPEC: { headerRow: 1 },
+  IMJAS: { headerRow: 1, detectHeader: true },
+  UNSPEC: { headerRow: 1, detectHeader: true },
 }
 
 const FILTER_DATE_RANGES = {
@@ -22,17 +24,32 @@ const FILTER_DATE_RANGES = {
 }
 
 const STATUS_OPTIONS = ['OPEN', 'CLOSE SYSTEM', 'CLOSE HD', 'CLOSE MYI']
+let RUNTIME_SPREADSHEET_DATA = null
+let RUNTIME_FILTER_OPTIONS = null
 
 function doGet(e) {
   try {
     const route = getRoute(e)
     const normalizedRoute = route.toLowerCase()
     const filters = getFilters(e)
+    const cacheKey = buildRouteCacheKey(normalizedRoute, filters)
+    if (shouldUseRouteCache(normalizedRoute)) {
+      const cachedPayload = getCachedJson(cacheKey)
+      if (cachedPayload) {
+        return jsonOutput(cachedPayload)
+      }
+    }
+
     let payload
 
     switch (normalizedRoute) {
       case 'health':
         payload = Object.assign({ ok: true }, getHealthData())
+        break
+      case 'filters':
+        payload = {
+          filters: getFilterOptions(),
+        }
         break
       case 'dashboard':
         payload = Object.assign({ filters: getFilterOptions() }, getDashboardData(filters))
@@ -85,6 +102,10 @@ function doGet(e) {
         break
     }
 
+    if (shouldUseRouteCache(normalizedRoute)) {
+      putCachedJson(cacheKey, payload, getRouteCacheTtl(normalizedRoute))
+    }
+
     return jsonOutput(payload)
   } catch (error) {
     return jsonOutput({
@@ -103,6 +124,49 @@ function getRoute(e) {
 
 function getFilters(e) {
   return e && e.parameter ? e.parameter : {}
+}
+
+function shouldUseRouteCache(route) {
+  return ['filters', 'dashboard', 'teams', 'rankings/teams', 'rankings/technicians', 'imjas', 'unspec'].indexOf(route) >= 0
+}
+
+function getRouteCacheTtl(route) {
+  return route === 'filters' ? CONFIG.filtersCacheTtlSeconds : CONFIG.cacheTtlSeconds
+}
+
+function buildRouteCacheKey(route, filters) {
+  const relevantFilters = {}
+  Object.keys(filters || {})
+    .sort()
+    .forEach(function (key) {
+      const value = filters[key]
+      if (value == null || value === '' || value === 'all') {
+        return
+      }
+      relevantFilters[key] = value
+    })
+  return 'route:' + route + ':' + JSON.stringify(relevantFilters)
+}
+
+function getCachedJson(key) {
+  const cache = CacheService.getScriptCache()
+  const raw = cache.get(key)
+  if (!raw) {
+    return null
+  }
+  try {
+    return JSON.parse(raw)
+  } catch (error) {
+    return null
+  }
+}
+
+function putCachedJson(key, value, ttlSeconds) {
+  try {
+    CacheService.getScriptCache().put(key, JSON.stringify(value), ttlSeconds)
+  } catch (error) {
+    // Ignore cache write failures and continue serving fresh data.
+  }
 }
 
 function jsonOutput(payload) {
@@ -145,6 +209,12 @@ function toNumber(value) {
 function toNullableText(value) {
   const normalized = normalizeText(value)
   return normalized || null
+}
+
+function hasPrimaryFields(row, keys) {
+  return keys.some(function (key) {
+    return normalizeText(row[key])
+  })
 }
 
 function normalizeStatus(value) {
@@ -263,7 +333,7 @@ function getDatabaseRawRows(spreadsheet) {
 
 function mapSheetObjects(spreadsheet, sheetName) {
   const bundle = getSheetBundle(spreadsheet, sheetName)
-  const headerRow = SHEET_CONFIG[sheetName] ? SHEET_CONFIG[sheetName].headerRow : 0
+  const headerRow = getHeaderRowIndex(sheetName, bundle.displayRows)
   const headers = bundle.displayRows[headerRow].map(function (value) {
     return normalizeKey(value)
   })
@@ -282,6 +352,33 @@ function mapSheetObjects(spreadsheet, sheetName) {
       })
       return item
     })
+}
+
+function getHeaderRowIndex(sheetName, rows) {
+  const config = SHEET_CONFIG[sheetName] || { headerRow: 0 }
+  if (!config.detectHeader) {
+    return config.headerRow || 0
+  }
+
+  const expectedHeadersBySheet = {
+    IMJAS: ['sto', 'team', 'ixsa_odp', 'ixsa_odc'],
+    UNSPEC: ['sto', 'team', 'open_unspec', 'close_unspec', 'sisa_unspec'],
+  }
+
+  const expectedHeaders = expectedHeadersBySheet[sheetName] || []
+  for (let rowIndex = 0; rowIndex < Math.min(rows.length, 8); rowIndex += 1) {
+    const normalizedRow = rows[rowIndex].map(function (cell) {
+      return normalizeKey(cell)
+    })
+    const allMatched = expectedHeaders.every(function (header) {
+      return normalizedRow.indexOf(header) >= 0
+    })
+    if (allMatched) {
+      return rowIndex
+    }
+  }
+
+  return config.headerRow || 0
 }
 
 function technicianDisplayName(value) {
@@ -307,6 +404,10 @@ function buildTeamLookup(teamMasterRows) {
 }
 
 function loadSpreadsheetData() {
+  if (RUNTIME_SPREADSHEET_DATA) {
+    return RUNTIME_SPREADSHEET_DATA
+  }
+
   const spreadsheet = getSpreadsheet()
   const teamMaster = mapSheetObjects(spreadsheet, 'TEAM_MASTER')
   const teamLookup = buildTeamLookup(teamMaster)
@@ -381,28 +482,36 @@ function loadSpreadsheetData() {
     }
   })
 
-  const imjas = mapSheetObjects(spreadsheet, 'IMJAS').map(function (row) {
-    return {
-      sto: normalizeText(row.sto),
-      team: normalizeText(row.team),
-      ixsaOdp: toNumber(row.ixsa_odp),
-      ixsaOdc: toNumber(row.ixsa_odc),
-      validasiTiang: toNullableText(row.validasi_tiang),
-    }
-  })
+  const imjas = mapSheetObjects(spreadsheet, 'IMJAS')
+    .filter(function (row) {
+      return hasPrimaryFields(row, ['sto', 'team'])
+    })
+    .map(function (row) {
+      return {
+        sto: normalizeText(row.sto),
+        team: normalizeText(row.team),
+        ixsaOdp: toNumber(row.ixsa_odp),
+        ixsaOdc: toNumber(row.ixsa_odc),
+        validasiTiang: toNullableText(row.validasi_tiang),
+      }
+    })
 
-  const unspec = mapSheetObjects(spreadsheet, 'UNSPEC').map(function (row) {
-    return {
-      sto: normalizeText(row.sto),
-      team: normalizeText(row.team),
-      openUnspec: toNumber(row.open_unspec),
-      closeUnspec: toNumber(row.close_unspec),
-      sisaUnspec: toNumber(row.sisa_unspec),
-      kendala: toNullableText(row.kendala),
-    }
-  })
+  const unspec = mapSheetObjects(spreadsheet, 'UNSPEC')
+    .filter(function (row) {
+      return hasPrimaryFields(row, ['sto', 'team'])
+    })
+    .map(function (row) {
+      return {
+        sto: normalizeText(row.sto),
+        team: normalizeText(row.team),
+        openUnspec: toNumber(row.open_unspec),
+        closeUnspec: toNumber(row.close_unspec),
+        sisaUnspec: toNumber(row.sisa_unspec),
+        kendala: toNullableText(row.kendala),
+      }
+    })
 
-  return {
+  RUNTIME_SPREADSHEET_DATA = {
     teamMaster: teamMaster,
     rawTickets: rawTickets,
     teamPerformance: teamPerformance,
@@ -412,6 +521,8 @@ function loadSpreadsheetData() {
     imjas: imjas,
     unspec: unspec,
   }
+
+  return RUNTIME_SPREADSHEET_DATA
 }
 
 function matchesDate(ticketDate, filters) {
@@ -597,8 +708,12 @@ function getHealthData() {
 }
 
 function getFilterOptions() {
+  if (RUNTIME_FILTER_OPTIONS) {
+    return RUNTIME_FILTER_OPTIONS
+  }
+
   const data = loadSpreadsheetData()
-  return {
+  RUNTIME_FILTER_OPTIONS = {
     dateRanges: [
       { value: 'all', label: 'Semua tanggal' },
       { value: 'today', label: 'Hari ini' },
@@ -643,6 +758,8 @@ function getFilterOptions() {
       ),
     ).sort(),
   }
+
+  return RUNTIME_FILTER_OPTIONS
 }
 
 function getDashboardData(filters) {
