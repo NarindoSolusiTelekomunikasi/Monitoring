@@ -30,8 +30,7 @@ let RUNTIME_FILTER_OPTIONS = null
 function doGet(e) {
   try {
     const route = getRoute(e)
-    const normalizedRoute = route.toLowerCase()git add .
-
+    const normalizedRoute = route.toLowerCase()
     const filters = getFilters(e)
     const cacheKey = buildRouteCacheKey(normalizedRoute, filters)
     if (shouldUseRouteCache(normalizedRoute)) {

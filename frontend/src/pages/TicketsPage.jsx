@@ -41,7 +41,7 @@ function TicketsPage() {
   )
 
   if (ticketsState.loading && !ticketsState.data) {
-    return <MessageBlock title="Memuat tiket" message="Mengambil antrean tiket dari workbook spreadsheet." />
+    return <MessageBlock title="Memuat tiket" message="Tunggu kak eh agak jaoh jerry beli rokok." />
   }
 
   if (ticketsState.error) {
