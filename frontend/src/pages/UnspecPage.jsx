@@ -36,7 +36,7 @@ function UnspecPage() {
         <KpiCard label="TOTAL Team" value={summary.totalTeams} trend="Jumlah keseluruhan team Narindo Solusi Telekomunikasi" badge="UNSPEC" tone="total" />
         <KpiCard label="Total Open UNSPEC Hari ini" value={summary.totalOpen} trend="Total open UNSPEC" badge="Diperlukan Follow Up Ke Teknisi." tone="open" />
         <KpiCard label="Total Close UNSPEC Hari ini" value={summary.totalClose} trend="Total close UNSPEC" badge="Close" tone="close" />
-        <KpiCard label="UNSPEC Yang Masih Open" value={summary.totalRemaining} trend="Total UNSPEC Yang Belum Diselesaikan." badge="Read only" tone="warning" />
+        <KpiCard label="UNSPEC Yang Masih Open" value={summary.totalRemaining} trend="Total UNSPEC Yang Belum Diselesaikan/Mengalami kendala." badge="Read only" tone="warning" />
       </section>
 
       <section className="panel table-panel">
