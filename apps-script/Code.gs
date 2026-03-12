@@ -688,12 +688,8 @@ function filterByCommonFields(items, filters, searchableFields) {
     const serviceMatches =
       !filters.serviceType ||
       filters.serviceType === 'all' ||
-      (!Object.prototype.hasOwnProperty.call(item, 'jenisTiket') &&
-        !Object.prototype.hasOwnProperty.call(item, 'serviceType') &&
-        !Object.prototype.hasOwnProperty.call(item, 'service')) ||
-      item.jenisTiket === filters.serviceType ||
-      item.serviceType === filters.serviceType ||
-      item.service === filters.serviceType
+      !Object.prototype.hasOwnProperty.call(item, 'jenisTiket') ||
+      item.jenisTiket === filters.serviceType
     const queryMatches =
       !query ||
       searchableFields.some(function (field) {

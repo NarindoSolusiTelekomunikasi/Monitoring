@@ -488,10 +488,8 @@ function filterByCommonFields(items, filters, searchableFields = []) {
     const serviceMatches =
       !filters.serviceType ||
       filters.serviceType === 'all' ||
-      (!('jenisTiket' in item) && !('serviceType' in item) && !('service' in item)) ||
-      item.jenisTiket === filters.serviceType ||
-      item.serviceType === filters.serviceType ||
-      item.service === filters.serviceType
+      !('jenisTiket' in item) ||
+      item.jenisTiket === filters.serviceType
     const queryMatches =
       !query ||
       searchableFields.some((field) => matchesQuery(item[field], query))
