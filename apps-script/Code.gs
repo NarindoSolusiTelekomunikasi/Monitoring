@@ -9,6 +9,7 @@ const CONFIG = {
 
 const SHEET_CONFIG = {
   DATABASE_RAW: { headerRow: 0 },
+  ManualDATABASE: { headerRow: 0 },
   TEAM_MASTER: { headerRow: 0 },
   TEKNISI_NARINDO: { headerRow: 0 },
   TEAM_PERFORMANCE: { headerRow: 0 },
@@ -26,6 +27,7 @@ const FILTER_DATE_RANGES = {
 }
 
 const STATUS_OPTIONS = ['OPEN', 'CLOSE SYSTEM', 'CLOSE HD', 'CLOSE MYI']
+const TICKET_SOURCE_SHEET = 'ManualDATABASE'
 let RUNTIME_SPREADSHEET_DATA = null
 let RUNTIME_FILTER_OPTIONS = null
 
@@ -300,7 +302,7 @@ function parseWorkbookDateText(value) {
 }
 
 function getDatabaseRawRows(spreadsheet) {
-  const bundle = getSheetBundle(spreadsheet, 'DATABASE_RAW')
+  const bundle = getSheetBundle(spreadsheet, TICKET_SOURCE_SHEET)
   const rows = []
 
   for (let rowIndex = 1; rowIndex < bundle.displayRows.length; rowIndex += 1) {
@@ -792,6 +794,7 @@ function getHealthData() {
   return {
     workbook: 'google-sheet-live',
     cacheVersion: CONFIG.cacheVersion,
+    ticketSourceSheet: TICKET_SOURCE_SHEET,
     source: {
       type: 'google-apps-script',
       spreadsheetId: CONFIG.spreadsheetId,

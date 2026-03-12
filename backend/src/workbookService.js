@@ -3,6 +3,7 @@ import XLSX from 'xlsx'
 
 const SHEET_CONFIG = {
   DATABASE_RAW: { headerRow: 0 },
+  ManualDATABASE: { headerRow: 0 },
   TEAM_MASTER: { headerRow: 0 },
   TEKNISI_NARINDO: { headerRow: 0 },
   TEAM_PERFORMANCE: { headerRow: 0 },
@@ -20,6 +21,7 @@ const FILTER_DATE_RANGES = {
 }
 
 const STATUS_OPTIONS = ['OPEN', 'CLOSE SYSTEM', 'CLOSE HD', 'CLOSE MYI']
+const TICKET_SOURCE_SHEET = 'ManualDATABASE'
 
 function getGoogleSheetsExportUrl() {
   const explicitUrl = normalizeText(process.env.GOOGLE_SHEETS_EXPORT_URL)
@@ -187,9 +189,9 @@ function getCellText(worksheet, ref, { preferRaw = false } = {}) {
 }
 
 function getDatabaseRawRows(workbook) {
-  const worksheet = workbook.Sheets.DATABASE_RAW
+  const worksheet = workbook.Sheets[TICKET_SOURCE_SHEET]
   if (!worksheet?.['!ref']) {
-    throw new Error('Sheet DATABASE_RAW was not found in workbook.')
+    throw new Error(`Sheet ${TICKET_SOURCE_SHEET} was not found in workbook.`)
   }
   const range = XLSX.utils.decode_range(worksheet['!ref'])
   const rows = []
@@ -562,6 +564,7 @@ export async function getHealthData() {
   const source = getWorkbookSourceMeta()
   return {
     workbook: 'google-sheet-export',
+    ticketSourceSheet: TICKET_SOURCE_SHEET,
     source,
     sheets: Object.keys(SHEET_CONFIG),
     counts: {
