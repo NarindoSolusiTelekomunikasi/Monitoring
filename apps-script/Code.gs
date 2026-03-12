@@ -403,6 +403,32 @@ function buildTeamLookup(teamMasterRows) {
   return lookup
 }
 
+function countMasterTechnicians(teamMasterRows, filters) {
+  const selectedStos = parseFilterValues(filters.sto)
+  const selectedTeams = parseFilterValues(filters.team)
+  const technicians = new Set()
+
+  teamMasterRows.forEach(function (row) {
+    const sto = normalizeText(row.sto)
+    const team = normalizeText(row.nama_team)
+    const stoMatches = selectedStos.length === 0 || selectedStos.indexOf(sto) >= 0
+    const teamMatches = selectedTeams.length === 0 || selectedTeams.indexOf(team) >= 0
+
+    if (!stoMatches || !teamMatches) {
+      return
+    }
+
+    ;[row.teknisi_1, row.teknisi_2]
+      .map(technicianDisplayName)
+      .filter(Boolean)
+      .forEach(function (name) {
+        technicians.add(name)
+      })
+  })
+
+  return technicians.size
+}
+
 function loadSpreadsheetData() {
   if (RUNTIME_SPREADSHEET_DATA) {
     return RUNTIME_SPREADSHEET_DATA
@@ -791,6 +817,7 @@ function getDashboardData(filters) {
   return {
     generatedAt: new Date().toISOString(),
     kpis: summary.kpis,
+    totalMasterTechnicians: countMasterTechnicians(data.teamMaster, filters),
     stoSummary: summary.stoSummary,
     topTeams: teamSummary.teams.slice(0, 6),
     topTechnicians: teamSummary.technicians.slice(0, 6),

@@ -42,6 +42,7 @@ function DashboardPage() {
     activeTechnicians: 0,
     closeRate: 0,
   }
+  const totalMasterTechnicians = data?.totalMasterTechnicians ?? 0
   const stoSummary = data?.stoSummary ?? []
   const topTeams = data?.topTeams ?? []
   const topTechnicians = data?.topTechnicians ?? []
@@ -56,7 +57,7 @@ function DashboardPage() {
         <KpiCard label="Total Tiket" value={kpis.totalTickets} trend="Total tiket open dan close." badge="Workbook live" tone="total" />
         <KpiCard label="Tiket Open" value={kpis.openTickets} trend="Total open tiket seluruh STO." badge="Perlu pantau" tone="open" />
         <KpiCard label="Tiket Close" value={kpis.closeTickets} trend={`${kpis.closeRate}% close rate`} badge="Selesai" tone="close" />
-        <KpiCard label="Total Teknisi Narindo" value={kpis.activeTechnicians} trend="Teknisi yang masuk hari ini." badge="Team lapangan" tone="warning" />
+        <KpiCard label="Total Teknisi Narindo" value={totalMasterTechnicians} trend="Total teknisi berdasarkan TEAM_MASTER." badge="Team lapangan" tone="warning" />
       </section>
 
       <section className="analytics-grid">

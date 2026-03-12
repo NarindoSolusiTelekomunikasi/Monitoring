@@ -291,6 +291,30 @@ function buildTeamLookup(teamMasterRows) {
   return lookup
 }
 
+function countMasterTechnicians(teamMasterRows, filters = {}) {
+  const selectedStos = parseFilterValues(filters.sto)
+  const selectedTeams = parseFilterValues(filters.team)
+  const technicians = new Set()
+
+  teamMasterRows.forEach((row) => {
+    const sto = normalizeText(row.sto)
+    const team = normalizeText(row.nama_team)
+    const stoMatches = selectedStos.length === 0 || selectedStos.includes(sto)
+    const teamMatches = selectedTeams.length === 0 || selectedTeams.includes(team)
+
+    if (!stoMatches || !teamMatches) {
+      return
+    }
+
+    ;[row.teknisi_1, row.teknisi_2]
+      .map(technicianDisplayName)
+      .filter(Boolean)
+      .forEach((name) => technicians.add(name))
+  })
+
+  return technicians.size
+}
+
 async function loadWorkbookData() {
   const workbook = await readWorkbook()
   const teamMaster = mapSheetObjects(workbook, 'TEAM_MASTER')
@@ -579,6 +603,7 @@ export async function getDashboardData(filters = {}) {
   return {
     generatedAt: new Date().toISOString(),
     kpis: summary.kpis,
+    totalMasterTechnicians: countMasterTechnicians(data.teamMaster, filters),
     stoSummary: summary.stoSummary,
     topTeams: teamSummary.teams.slice(0, 6),
     topTechnicians: teamSummary.technicians.slice(0, 6),
