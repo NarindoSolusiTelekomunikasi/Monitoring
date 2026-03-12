@@ -22,6 +22,7 @@ const FILTER_DATE_RANGES = {
 
 const STATUS_OPTIONS = ['OPEN', 'CLOSE SYSTEM', 'CLOSE HD', 'CLOSE MYI']
 const TICKET_SOURCE_SHEET = 'ManualDATABASE'
+const JAKARTA_OFFSET_MS = 7 * 60 * 60 * 1000
 
 function getGoogleSheetsExportUrl() {
   const explicitUrl = normalizeText(process.env.GOOGLE_SHEETS_EXPORT_URL)
@@ -402,9 +403,13 @@ function matchesDate(ticketDate, filters) {
   if (filters.dateRange && filters.dateRange !== 'all') {
     const days = FILTER_DATE_RANGES[filters.dateRange]
     if (days != null) {
-      const now = new Date()
-      const diff = (now.getTime() - date.getTime()) / (1000 * 60 * 60 * 24)
-      if (diff > days) return false
+      const diff = getJakartaDayDiff(date)
+      if (diff == null || diff < 0) return false
+      if (filters.dateRange === 'today') {
+        if (diff !== 0) return false
+      } else if (diff >= days) {
+        return false
+      }
     }
   }
   return true
@@ -412,6 +417,25 @@ function matchesDate(ticketDate, filters) {
 
 function matchesQuery(value, query) {
   return normalizeText(value).toLowerCase().includes(normalizeText(query).toLowerCase())
+}
+
+function toJakartaDayKey(value) {
+  const date = value instanceof Date ? value : new Date(value)
+  if (Number.isNaN(date.getTime())) {
+    return null
+  }
+  return new Date(date.getTime() + JAKARTA_OFFSET_MS).toISOString().slice(0, 10)
+}
+
+function getJakartaDayDiff(left, right = new Date()) {
+  const leftKey = toJakartaDayKey(left)
+  const rightKey = toJakartaDayKey(right)
+  if (!leftKey || !rightKey) {
+    return null
+  }
+  const leftDate = new Date(`${leftKey}T00:00:00Z`)
+  const rightDate = new Date(`${rightKey}T00:00:00Z`)
+  return Math.round((rightDate.getTime() - leftDate.getTime()) / 86400000)
 }
 
 function parseFilterValues(value) {

@@ -28,6 +28,7 @@ const FILTER_DATE_RANGES = {
 
 const STATUS_OPTIONS = ['OPEN', 'CLOSE SYSTEM', 'CLOSE HD', 'CLOSE MYI']
 const TICKET_SOURCE_SHEET = 'ManualDATABASE'
+const JAKARTA_OFFSET_MS = 7 * 60 * 60 * 1000
 let RUNTIME_SPREADSHEET_DATA = null
 let RUNTIME_FILTER_OPTIONS = null
 
@@ -594,9 +595,13 @@ function matchesDate(ticketDate, filters) {
   if (filters.dateRange && filters.dateRange !== 'all') {
     const days = FILTER_DATE_RANGES[filters.dateRange]
     if (days != null) {
-      const now = new Date()
-      const diff = (now.getTime() - date.getTime()) / (1000 * 60 * 60 * 24)
-      if (diff > days) return false
+      const diff = getJakartaDayDiff(date)
+      if (diff == null || diff < 0) return false
+      if (filters.dateRange === 'today') {
+        if (diff !== 0) return false
+      } else if (diff >= days) {
+        return false
+      }
     }
   }
 
@@ -605,6 +610,25 @@ function matchesDate(ticketDate, filters) {
 
 function matchesQuery(value, query) {
   return normalizeText(value).toLowerCase().indexOf(normalizeText(query).toLowerCase()) >= 0
+}
+
+function toJakartaDayKey(value) {
+  const date = Object.prototype.toString.call(value) === '[object Date]' ? value : new Date(value)
+  if (Number.isNaN(date.getTime())) {
+    return null
+  }
+  return new Date(date.getTime() + JAKARTA_OFFSET_MS).toISOString().slice(0, 10)
+}
+
+function getJakartaDayDiff(left, right) {
+  const leftKey = toJakartaDayKey(left)
+  const rightKey = toJakartaDayKey(right || new Date())
+  if (!leftKey || !rightKey) {
+    return null
+  }
+  const leftDate = new Date(leftKey + 'T00:00:00Z')
+  const rightDate = new Date(rightKey + 'T00:00:00Z')
+  return Math.round((rightDate.getTime() - leftDate.getTime()) / 86400000)
 }
 
 function parseFilterValues(value) {
