@@ -16,7 +16,7 @@ function useApiResource(loader, deps = [], options = {}) {
 
     const runLoader = ({ preserveData = false } = {}) => {
       setState((current) => ({
-        data: current.data,
+        data: preserveData ? current.data : null,
         error: '',
         loading: true,
       }))
