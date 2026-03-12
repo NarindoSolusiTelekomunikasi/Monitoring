@@ -617,6 +617,33 @@ function parseFilterValues(value) {
     .filter(Boolean)
 }
 
+function collectUniqueValues(values) {
+  return Array.from(
+    new Set(
+      values
+        .map(function (value) {
+          return normalizeText(value)
+        })
+        .filter(Boolean),
+    ),
+  ).sort()
+}
+
+function countUniqueTeams(items) {
+  return new Set(
+    items
+      .map(function (item) {
+        const sto = normalizeText(item.sto)
+        const team = normalizeText(item.team)
+        if (!sto && !team) {
+          return ''
+        }
+        return `${sto}::${team}`
+      })
+      .filter(Boolean),
+  ).size
+}
+
 function filterByCommonFields(items, filters, searchableFields) {
   const query = filters.search || ''
   const selectedStos = parseFilterValues(filters.sto)
@@ -791,43 +818,111 @@ function getFilterOptions() {
       { value: '7d', label: '7 hari terakhir' },
       { value: '30d', label: '30 hari terakhir' },
     ],
-    stos: Array.from(
-      new Set(
-        data.rawTickets
-          .map(function (ticket) {
+    stos: collectUniqueValues(
+      []
+        .concat(
+          data.rawTickets.map(function (ticket) {
             return ticket.sto
-          })
-          .filter(Boolean),
-      ),
-    ).sort(),
-    teams: Array.from(
-      new Set(
-        data.teamMaster
-          .map(function (item) {
-            return normalizeText(item.nama_team)
-          })
-          .filter(Boolean),
-      ),
-    ).sort(),
-    teknisis: Array.from(
-      new Set(
-        data.rawTickets
-          .map(function (ticket) {
+          }),
+        )
+        .concat(
+          data.teamMaster.map(function (item) {
+            return item.sto
+          }),
+        )
+        .concat(
+          data.teknisiNarindo.map(function (item) {
+            return item.sto
+          }),
+        )
+        .concat(
+          data.teamPerformance.map(function (item) {
+            return item.sto
+          }),
+        )
+        .concat(
+          data.stoCommandCenter.map(function (item) {
+            return item.sto
+          }),
+        )
+        .concat(
+          data.imjas.map(function (item) {
+            return item.sto
+          }),
+        )
+        .concat(
+          data.unspec.map(function (item) {
+            return item.sto
+          }),
+        ),
+    ),
+    teams: collectUniqueValues(
+      []
+        .concat(
+          data.teamMaster.map(function (item) {
+            return item.nama_team
+          }),
+        )
+        .concat(
+          data.rawTickets.map(function (ticket) {
+            return ticket.team
+          }),
+        )
+        .concat(
+          data.teknisiNarindo.map(function (item) {
+            return item.team
+          }),
+        )
+        .concat(
+          data.teamPerformance.map(function (item) {
+            return item.team
+          }),
+        )
+        .concat(
+          data.stoCommandCenter.map(function (item) {
+            return item.team
+          }),
+        )
+        .concat(
+          data.rankingTeams.map(function (item) {
+            return item.team
+          }),
+        )
+        .concat(
+          data.imjas.map(function (item) {
+            return item.team
+          }),
+        )
+        .concat(
+          data.unspec.map(function (item) {
+            return item.team
+          }),
+        ),
+    ),
+    teknisis: collectUniqueValues(
+      []
+        .concat(
+          data.rawTickets.map(function (ticket) {
             return ticket.teknisi
-          })
-          .filter(Boolean),
-      ),
-    ).sort(),
+          }),
+        )
+        .concat(
+          data.teknisiNarindo.map(function (item) {
+            return item.teknisi
+          }),
+        )
+        .concat(
+          data.rankingTechnicians.map(function (item) {
+            return item.teknisi
+          }),
+        ),
+    ),
     statuses: STATUS_OPTIONS,
-    serviceTypes: Array.from(
-      new Set(
-        data.rawTickets
-          .map(function (ticket) {
-            return ticket.serviceType
-          })
-          .filter(Boolean),
-      ),
-    ).sort(),
+    serviceTypes: collectUniqueValues(
+      data.rawTickets.map(function (ticket) {
+        return ticket.serviceType
+      }),
+    ),
   }
 
   return RUNTIME_FILTER_OPTIONS
@@ -909,7 +1004,7 @@ function getRankedTechnicians(filters) {
 
 function summarizeImjas(items) {
   return {
-    totalTeams: items.length,
+    totalTeams: countUniqueTeams(items),
     totalIxsaOdp: items.reduce(function (sum, item) {
       return sum + item.ixsaOdp
     }, 0),
@@ -921,7 +1016,7 @@ function summarizeImjas(items) {
 
 function summarizeUnspec(items) {
   return {
-    totalTeams: items.length,
+    totalTeams: countUniqueTeams(items),
     totalOpen: items.reduce(function (sum, item) {
       return sum + item.openUnspec
     }, 0),

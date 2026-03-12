@@ -11,7 +11,7 @@ const workspaceRoot = path.resolve(__dirname, '..', '..')
 const SHEET_CONFIG = {
   DATABASE_RAW: { headerRow: 0 },
   TEAM_MASTER: { headerRow: 0 },
-  TEKNISI_NARINDO: { headerRow: 0 },
+  TEKNISI_NARINDO: { headerRow: 0, optional: true },
   TEAM_PERFORMANCE: { headerRow: 0 },
   STO_COMMAND_CENTER: { headerRow: 0 },
   RANKING_TEAM: { headerRow: 0 },
@@ -96,6 +96,9 @@ async function readWorkbook() {
 function getSheetRows(workbook, sheetName) {
   const worksheet = workbook.Sheets[sheetName]
   if (!worksheet) {
+    if (SHEET_CONFIG[sheetName]?.optional) {
+      return []
+    }
     throw new Error(`Sheet ${sheetName} was not found in workbook.`)
   }
   return XLSX.utils.sheet_to_json(worksheet, {
@@ -256,6 +259,9 @@ function getDatabaseRawRows(workbook) {
 
 function mapSheetObjects(workbook, sheetName) {
   const rows = getSheetRows(workbook, sheetName)
+  if (!rows.length) {
+    return []
+  }
   const headerRow = SHEET_CONFIG[sheetName]?.headerRow ?? 0
   const headers = rows[headerRow].map((value) => normalizeKey(value))
   return rows
@@ -335,7 +341,18 @@ async function loadWorkbookData() {
   const workbook = await readWorkbook()
   const teamMaster = mapSheetObjects(workbook, 'TEAM_MASTER')
   const teamLookup = buildTeamLookup(teamMaster)
-  const teknisiNarindo = mapSheetObjects(workbook, 'TEKNISI_NARINDO').map((row) => {
+  const teknisiNarindoSheetRows = mapSheetObjects(workbook, 'TEKNISI_NARINDO')
+  const teknisiNarindoSeed = teknisiNarindoSheetRows.length
+    ? teknisiNarindoSheetRows
+    : teamMaster.flatMap((row) =>
+        [row.teknisi_1, row.teknisi_2]
+          .map((teknisi) => ({
+            sto: normalizeText(row.sto),
+            teknisi: normalizeText(teknisi),
+          }))
+          .filter((item) => item.teknisi),
+      )
+  const teknisiNarindo = teknisiNarindoSeed.map((row) => {
     const technicianName = technicianDisplayName(row.teknisi)
     const teamInfo = teamLookup.get(technicianName.toUpperCase()) ?? null
     return {
@@ -468,6 +485,25 @@ function parseFilterValues(value) {
     .split(',')
     .map((item) => normalizeText(item))
     .filter(Boolean)
+}
+
+function collectUniqueValues(values) {
+  return [...new Set(values.map((value) => normalizeText(value)).filter(Boolean))].sort()
+}
+
+function countUniqueTeams(items) {
+  return new Set(
+    items
+      .map((item) => {
+        const sto = normalizeText(item.sto)
+        const team = normalizeText(item.team)
+        if (!sto && !team) {
+          return ''
+        }
+        return `${sto}::${team}`
+      })
+      .filter(Boolean),
+  ).size
 }
 
 function filterByCommonFields(items, filters, searchableFields = []) {
@@ -611,11 +647,32 @@ export async function getFilterOptions() {
       { value: '7d', label: '7 hari terakhir' },
       { value: '30d', label: '30 hari terakhir' },
     ],
-    stos: [...new Set(data.rawTickets.map((ticket) => ticket.sto).filter(Boolean))].sort(),
-    teams: [...new Set(data.teamMaster.map((item) => normalizeText(item.nama_team)).filter(Boolean))].sort(),
-    teknisis: [...new Set(data.rawTickets.map((ticket) => ticket.teknisi).filter(Boolean))].sort(),
+    stos: collectUniqueValues([
+      ...data.rawTickets.map((ticket) => ticket.sto),
+      ...data.teamMaster.map((item) => item.sto),
+      ...data.teknisiNarindo.map((item) => item.sto),
+      ...data.teamPerformance.map((item) => item.sto),
+      ...data.stoCommandCenter.map((item) => item.sto),
+      ...data.imjas.map((item) => item.sto),
+      ...data.unspec.map((item) => item.sto),
+    ]),
+    teams: collectUniqueValues([
+      ...data.teamMaster.map((item) => item.nama_team),
+      ...data.rawTickets.map((ticket) => ticket.team),
+      ...data.teknisiNarindo.map((item) => item.team),
+      ...data.teamPerformance.map((item) => item.team),
+      ...data.stoCommandCenter.map((item) => item.team),
+      ...data.rankingTeams.map((item) => item.team),
+      ...data.imjas.map((item) => item.team),
+      ...data.unspec.map((item) => item.team),
+    ]),
+    teknisis: collectUniqueValues([
+      ...data.rawTickets.map((ticket) => ticket.teknisi),
+      ...data.teknisiNarindo.map((item) => item.teknisi),
+      ...data.rankingTechnicians.map((item) => item.teknisi),
+    ]),
     statuses: STATUS_OPTIONS,
-    serviceTypes: [...new Set(data.rawTickets.map((ticket) => ticket.serviceType).filter(Boolean))].sort(),
+    serviceTypes: collectUniqueValues(data.rawTickets.map((ticket) => ticket.serviceType)),
   }
 }
 
@@ -684,7 +741,7 @@ export async function getRankedTechnicians(filters = {}) {
 
 function summarizeImjas(items) {
   return {
-    totalTeams: items.length,
+    totalTeams: countUniqueTeams(items),
     totalIxsaOdp: items.reduce((sum, item) => sum + item.ixsaOdp, 0),
     totalIxsaOdc: items.reduce((sum, item) => sum + item.ixsaOdc, 0),
   }
@@ -692,7 +749,7 @@ function summarizeImjas(items) {
 
 function summarizeUnspec(items) {
   return {
-    totalTeams: items.length,
+    totalTeams: countUniqueTeams(items),
     totalOpen: items.reduce((sum, item) => sum + item.openUnspec, 0),
     totalClose: items.reduce((sum, item) => sum + item.closeUnspec, 0),
     totalRemaining: items.reduce((sum, item) => sum + item.sisaUnspec, 0),
