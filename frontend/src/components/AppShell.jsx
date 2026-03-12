@@ -1,7 +1,7 @@
 import { useMemo } from 'react'
 import { Outlet, useLocation } from 'react-router-dom'
 import { useDashboard } from '../context/DashboardContext'
-import { getFilters } from '../data/api'
+import { getFilters, getHealth } from '../data/api'
 import useApiResource from '../hooks/useApiResource'
 import FilterBar from './FilterBar'
 import Sidebar from './Sidebar'
@@ -43,6 +43,7 @@ function AppShell() {
   const { state, toggleMobileNav, closeMobileNav, resetFilters } = useDashboard()
   const meta = pageMeta[location.pathname] ?? pageMeta['/']
   const { data } = useApiResource(() => getFilters(), [], { refreshMs: 300000 })
+  const { data: health } = useApiResource(() => getHealth(), [], { refreshMs: 60000 })
 
   const activeFilters = useMemo(
     () =>
@@ -65,6 +66,7 @@ function AppShell() {
         onClose={closeMobileNav}
         activeFilters={activeFilters}
         onResetFilters={resetFilters}
+        health={health}
       />
 
       {state.mobileNavOpen ? <button className="mobile-overlay" onClick={closeMobileNav} aria-label="Tutup sidebar" /> : null}

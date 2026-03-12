@@ -1,4 +1,4 @@
-﻿import { NavLink } from 'react-router-dom'
+import { NavLink } from 'react-router-dom'
 
 const navItems = [
   { to: '/', label: 'Dashboard', end: true },
@@ -8,7 +8,30 @@ const navItems = [
   { to: '/unspec', label: 'UNSPEC' },
 ]
 
-function Sidebar({ mobileOpen, onClose, activeFilters, onResetFilters }) {
+function formatSpreadsheetId(value) {
+  if (!value) {
+    return '-'
+  }
+  if (value.length <= 14) {
+    return value
+  }
+  return `${value.slice(0, 8)}...${value.slice(-6)}`
+}
+
+function getSourceLabel(source) {
+  if (!source?.type) {
+    return 'Memuat source...'
+  }
+  if (source.type === 'google' || source.type === 'google-apps-script') {
+    return 'Google Spreadsheet Live'
+  }
+  return source.type
+}
+
+function Sidebar({ mobileOpen, onClose, activeFilters, onResetFilters, health }) {
+  const source = health?.source ?? null
+  const counts = health?.counts ?? null
+
   return (
     <aside className={`sidebar ${mobileOpen ? 'sidebar--open' : ''}`}>
       <div className="sidebar__brand">
@@ -35,8 +58,14 @@ function Sidebar({ mobileOpen, onClose, activeFilters, onResetFilters }) {
 
       <div className="sidebar__panel">
         <span className="eyebrow">Real Time</span>
-        <strong>API Live</strong>
-        <p>.</p>
+        <strong>{getSourceLabel(source)}</strong>
+        <p>Spreadsheet ID: {formatSpreadsheetId(source?.spreadsheetId)}</p>
+        {counts ? (
+          <div className="sidebar__stats">
+            <span>Tiket {counts.rawTickets ?? 0}</span>
+            <span>Teknisi {counts.teknisiNarindo ?? 0}</span>
+          </div>
+        ) : null}
       </div>
 
       <div className="sidebar__panel sidebar__panel--filters">
