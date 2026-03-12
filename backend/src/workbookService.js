@@ -488,7 +488,8 @@ function filterByCommonFields(items, filters, searchableFields = []) {
     const serviceMatches =
       !filters.serviceType ||
       filters.serviceType === 'all' ||
-      !('serviceType' in item) ||
+      (!('jenisTiket' in item) && !('serviceType' in item) && !('service' in item)) ||
+      item.jenisTiket === filters.serviceType ||
       item.serviceType === filters.serviceType ||
       item.service === filters.serviceType
     const queryMatches =
@@ -635,7 +636,7 @@ export async function getFilterOptions() {
       ...data.rankingTechnicians.map((item) => item.teknisi),
     ]),
     statuses: STATUS_OPTIONS,
-    serviceTypes: collectUniqueValues(data.rawTickets.map((ticket) => ticket.serviceType)),
+    serviceTypes: collectUniqueValues(data.rawTickets.map((ticket) => ticket.jenisTiket)),
   }
 }
 
@@ -644,7 +645,7 @@ export async function getDashboardData(filters = {}) {
   const filteredTickets = filterByCommonFields(
     data.rawTickets.filter((ticket) => matchesDate(ticket.tanggal, filters)),
     filters,
-    ['incident', 'summary', 'contactName', 'teknisi', 'serviceType', 'sto'],
+    ['incident', 'summary', 'contactName', 'teknisi', 'jenisTiket', 'serviceType', 'sto'],
   )
   const summary = summarizeTickets(filteredTickets)
   const teamSummary = summarizeTeams(filteredTickets)
@@ -663,7 +664,7 @@ export async function getTicketData(filters = {}) {
   return filterByCommonFields(
     data.rawTickets.filter((ticket) => matchesDate(ticket.tanggal, filters)),
     filters,
-    ['incident', 'summary', 'contactName', 'teknisi', 'serviceType', 'sto'],
+    ['incident', 'summary', 'contactName', 'teknisi', 'jenisTiket', 'serviceType', 'sto'],
   ).sort((a, b) => {
     const left = a.tanggal ? new Date(a.tanggal).getTime() : 0
     const right = b.tanggal ? new Date(b.tanggal).getTime() : 0
@@ -681,7 +682,7 @@ export async function getTeamData(filters = {}) {
   const filteredTickets = filterByCommonFields(
     data.rawTickets.filter((ticket) => matchesDate(ticket.tanggal, filters)),
     filters,
-    ['incident', 'summary', 'contactName', 'teknisi', 'serviceType', 'sto'],
+    ['incident', 'summary', 'contactName', 'teknisi', 'jenisTiket', 'serviceType', 'sto'],
   )
   const summary = summarizeTeams(filteredTickets)
   return {

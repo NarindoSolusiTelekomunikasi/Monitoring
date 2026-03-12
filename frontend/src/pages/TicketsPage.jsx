@@ -83,7 +83,7 @@ function TicketsPage() {
               type="search"
               value={searchTerm}
               onChange={(event) => setSearchTerm(event.target.value)}
-              placeholder="Cari incident, customer, layanan, teknisi"
+              placeholder="Cari incident, customer, jenis tiket, teknisi"
             />
           </div>
         </div>

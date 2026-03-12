@@ -688,7 +688,10 @@ function filterByCommonFields(items, filters, searchableFields) {
     const serviceMatches =
       !filters.serviceType ||
       filters.serviceType === 'all' ||
-      !Object.prototype.hasOwnProperty.call(item, 'serviceType') ||
+      (!Object.prototype.hasOwnProperty.call(item, 'jenisTiket') &&
+        !Object.prototype.hasOwnProperty.call(item, 'serviceType') &&
+        !Object.prototype.hasOwnProperty.call(item, 'service')) ||
+      item.jenisTiket === filters.serviceType ||
       item.serviceType === filters.serviceType ||
       item.service === filters.serviceType
     const queryMatches =
@@ -949,7 +952,7 @@ function getFilterOptions() {
     statuses: STATUS_OPTIONS,
     serviceTypes: collectUniqueValues(
       data.rawTickets.map(function (ticket) {
-        return ticket.serviceType
+        return ticket.jenisTiket
       }),
     ),
   }
@@ -964,7 +967,7 @@ function getDashboardData(filters) {
       return matchesDate(ticket.tanggal, filters)
     }),
     filters,
-    ['incident', 'summary', 'contactName', 'teknisi', 'serviceType', 'sto'],
+    ['incident', 'summary', 'contactName', 'teknisi', 'jenisTiket', 'serviceType', 'sto'],
   )
   const summary = summarizeTickets(filteredTickets)
   const teamSummary = summarizeTeams(filteredTickets)
@@ -987,7 +990,7 @@ function getTicketData(filters) {
       return matchesDate(ticket.tanggal, filters)
     }),
     filters,
-    ['incident', 'summary', 'contactName', 'teknisi', 'serviceType', 'sto'],
+    ['incident', 'summary', 'contactName', 'teknisi', 'jenisTiket', 'serviceType', 'sto'],
   ).sort(function (left, right) {
     const leftTime = left.tanggal ? new Date(left.tanggal).getTime() : 0
     const rightTime = right.tanggal ? new Date(right.tanggal).getTime() : 0
@@ -1011,7 +1014,7 @@ function getTeamData(filters) {
       return matchesDate(ticket.tanggal, filters)
     }),
     filters,
-    ['incident', 'summary', 'contactName', 'teknisi', 'serviceType', 'sto'],
+    ['incident', 'summary', 'contactName', 'teknisi', 'jenisTiket', 'serviceType', 'sto'],
   )
   const summary = summarizeTeams(filteredTickets)
   return {

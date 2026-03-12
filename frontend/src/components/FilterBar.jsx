@@ -5,7 +5,7 @@ const allLabels = {
   STO: 'Semua STO',
   Team: 'Semua team',
   Status: 'Semua status',
-  Layanan: 'Semua layanan',
+  'Jenis Tiket': 'Semua jenis tiket',
   Teknisi: 'Semua teknisi',
 }
 
@@ -122,7 +122,7 @@ function FilterBar({ title, description, options }) {
           onChange={(event) => setFilter('status', event.target.value)}
         />
         <FilterSelect
-          label="Layanan"
+          label="Jenis Tiket"
           value={state.filters.serviceType}
           options={['all', ...(options.serviceTypes ?? [])]}
           onChange={(event) => setFilter('serviceType', event.target.value)}
