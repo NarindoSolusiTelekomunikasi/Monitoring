@@ -1,17 +1,10 @@
 import 'dotenv/config'
-import fs from 'node:fs/promises'
-import path from 'node:path'
-import { fileURLToPath } from 'node:url'
 import XLSX from 'xlsx'
-
-const __filename = fileURLToPath(import.meta.url)
-const __dirname = path.dirname(__filename)
-const workspaceRoot = path.resolve(__dirname, '..', '..')
 
 const SHEET_CONFIG = {
   DATABASE_RAW: { headerRow: 0 },
   TEAM_MASTER: { headerRow: 0 },
-  TEKNISI_NARINDO: { headerRow: 0, optional: true },
+  TEKNISI_NARINDO: { headerRow: 0 },
   TEAM_PERFORMANCE: { headerRow: 0 },
   STO_COMMAND_CENTER: { headerRow: 0 },
   RANKING_TEAM: { headerRow: 0 },
@@ -28,15 +21,6 @@ const FILTER_DATE_RANGES = {
 
 const STATUS_OPTIONS = ['OPEN', 'CLOSE SYSTEM', 'CLOSE HD', 'CLOSE MYI']
 
-function getDataSource() {
-  return normalizeText(process.env.DATA_SOURCE || 'local').toLowerCase()
-}
-
-function getLocalWorkbookPath() {
-  const configuredPath = normalizeText(process.env.LOCAL_WORKBOOK_PATH || 'TECHNICIAN_MONITORING_SYSTEM.xlsx')
-  return path.resolve(workspaceRoot, configuredPath)
-}
-
 function getGoogleSheetsExportUrl() {
   const explicitUrl = normalizeText(process.env.GOOGLE_SHEETS_EXPORT_URL)
   if (explicitUrl) {
@@ -50,43 +34,24 @@ function getGoogleSheetsExportUrl() {
 }
 
 function getWorkbookSourceMeta() {
-  if (getDataSource() === 'google') {
-    const spreadsheetId = normalizeText(process.env.GOOGLE_SHEETS_SPREADSHEET_ID)
-    return {
-      type: 'google',
-      spreadsheetId,
-      location: getGoogleSheetsExportUrl(),
-    }
-  }
-
-  const workbookPath = getLocalWorkbookPath()
+  const spreadsheetId = normalizeText(process.env.GOOGLE_SHEETS_SPREADSHEET_ID)
   return {
-    type: 'local',
-    spreadsheetId: null,
-    location: workbookPath,
+    type: 'google',
+    spreadsheetId,
+    location: getGoogleSheetsExportUrl(),
   }
 }
 
 async function readWorkbook() {
-  if (getDataSource() === 'google') {
-    const exportUrl = getGoogleSheetsExportUrl()
-    const response = await fetch(exportUrl)
-    if (!response.ok) {
-      throw new Error(
-        `Google Sheets export failed with ${response.status}. Publish or share the sheet so it can be exported, or provide GOOGLE_SHEETS_EXPORT_URL with accessible access.`,
-      )
-    }
-    const arrayBuffer = await response.arrayBuffer()
-    return XLSX.read(Buffer.from(arrayBuffer), {
-      type: 'buffer',
-      raw: false,
-      cellDates: false,
-    })
+  const exportUrl = getGoogleSheetsExportUrl()
+  const response = await fetch(exportUrl)
+  if (!response.ok) {
+    throw new Error(
+      `Google Sheets export failed with ${response.status}. Publish or share the sheet so it can be exported, or provide GOOGLE_SHEETS_EXPORT_URL with accessible access.`,
+    )
   }
-
-  const workbookPath = getLocalWorkbookPath()
-  const fileBuffer = await fs.readFile(workbookPath)
-  return XLSX.read(fileBuffer, {
+  const arrayBuffer = await response.arrayBuffer()
+  return XLSX.read(Buffer.from(arrayBuffer), {
     type: 'buffer',
     raw: false,
     cellDates: false,
@@ -96,9 +61,6 @@ async function readWorkbook() {
 function getSheetRows(workbook, sheetName) {
   const worksheet = workbook.Sheets[sheetName]
   if (!worksheet) {
-    if (SHEET_CONFIG[sheetName]?.optional) {
-      return []
-    }
     throw new Error(`Sheet ${sheetName} was not found in workbook.`)
   }
   return XLSX.utils.sheet_to_json(worksheet, {
@@ -298,21 +260,6 @@ function buildTeamLookup(teamMasterRows) {
   return lookup
 }
 
-function countMasterTechnicians(teamMasterRows, filters = {}) {
-  return countTechniciansNarindo(
-    teamMasterRows.flatMap((row) =>
-      [row.teknisi_1, row.teknisi_2]
-        .map((teknisi) => ({
-          sto: normalizeText(row.sto),
-          team: normalizeText(row.nama_team),
-          teknisi: technicianDisplayName(teknisi),
-        }))
-        .filter((item) => item.teknisi),
-    ),
-    filters,
-  )
-}
-
 function countTechniciansNarindo(teknisiNarindoRows, filters = {}) {
   const selectedStos = parseFilterValues(filters.sto)
   const selectedTeams = parseFilterValues(filters.team)
@@ -341,18 +288,7 @@ async function loadWorkbookData() {
   const workbook = await readWorkbook()
   const teamMaster = mapSheetObjects(workbook, 'TEAM_MASTER')
   const teamLookup = buildTeamLookup(teamMaster)
-  const teknisiNarindoSheetRows = mapSheetObjects(workbook, 'TEKNISI_NARINDO')
-  const teknisiNarindoSeed = teknisiNarindoSheetRows.length
-    ? teknisiNarindoSheetRows
-    : teamMaster.flatMap((row) =>
-        [row.teknisi_1, row.teknisi_2]
-          .map((teknisi) => ({
-            sto: normalizeText(row.sto),
-            teknisi: normalizeText(teknisi),
-          }))
-          .filter((item) => item.teknisi),
-      )
-  const teknisiNarindo = teknisiNarindoSeed.map((row) => {
+  const teknisiNarindo = mapSheetObjects(workbook, 'TEKNISI_NARINDO').map((row) => {
     const technicianName = technicianDisplayName(row.teknisi)
     const teamInfo = teamLookup.get(technicianName.toUpperCase()) ?? null
     return {
@@ -625,7 +561,7 @@ export async function getHealthData() {
   const data = await loadWorkbookData()
   const source = getWorkbookSourceMeta()
   return {
-    workbook: source.type === 'local' ? path.basename(source.location) : 'google-sheet-export',
+    workbook: 'google-sheet-export',
     source,
     sheets: Object.keys(SHEET_CONFIG),
     counts: {
