@@ -48,7 +48,7 @@ function AppShell() {
   const activeFilters = useMemo(
     () =>
       Object.entries(state.filters)
-        .filter(([, value]) => value !== 'all')
+        .filter(([, value]) => value && value !== 'all')
         .map(([key, value]) => ({ key, value })),
     [state.filters],
   )

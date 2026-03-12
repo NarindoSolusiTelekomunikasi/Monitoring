@@ -18,6 +18,8 @@ function TeamsPage() {
     () => getTeams(state.filters),
     [
       state.filters.dateRange,
+      state.filters.dateFrom,
+      state.filters.dateTo,
       state.filters.sto,
       state.filters.team,
       state.filters.status,

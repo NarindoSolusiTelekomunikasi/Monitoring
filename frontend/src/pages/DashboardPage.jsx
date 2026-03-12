@@ -19,6 +19,8 @@ function DashboardPage() {
     () => getDashboard(state.filters),
     [
       state.filters.dateRange,
+      state.filters.dateFrom,
+      state.filters.dateTo,
       state.filters.sto,
       state.filters.team,
       state.filters.status,
@@ -65,8 +67,7 @@ function DashboardPage() {
           <div className="section-heading">
             <div>
               <h2>Status Tiket</h2>
-              <p>Ringkasan open dan close tiket hari ini dan filter global hari ini.</p>git status
-
+              <p>Ringkasan open dan close tiket hari ini dan filter global hari ini.</p>
             </div>
             <span className="pill pill--total">Filter</span>
           </div>

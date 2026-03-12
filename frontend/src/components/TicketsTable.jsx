@@ -26,7 +26,7 @@ function TicketsTable({ tickets, onSelectTicket }) {
               <th>Status</th>
               <th>Teknisi</th>
               <th>Tanggal</th>
-              <th>Layanan</th>
+              <th>Jenis Tiket</th>
             </tr>
           </thead>
           <tbody>
@@ -42,7 +42,7 @@ function TicketsTable({ tickets, onSelectTicket }) {
                 </td>
                 <td>{ticket.teknisi || '-'}</td>
                 <td>{ticket.tanggal ? new Date(ticket.tanggal).toLocaleDateString('id-ID') : '-'}</td>
-                <td>{ticket.serviceType || '-'}</td>
+                <td>{ticket.jenisTiket || '-'}</td>
               </tr>
             ))}
           </tbody>
@@ -57,9 +57,7 @@ function TicketsTable({ tickets, onSelectTicket }) {
               <span className={`pill pill--${getStatusTone(ticket.status)}`}>{ticket.status}</span>
             </div>
             <h3>{ticket.contactName || ticket.contactPhone || 'Pelanggan'}</h3>
-            <p>
-              {ticket.sto || '-'} • {ticket.teknisi || '-'} • {ticket.serviceType || '-'}
-            </p>
+            <p>{`${ticket.sto || '-'} | ${ticket.teknisi || '-'} | ${ticket.jenisTiket || '-'}`}</p>
           </article>
         ))}
       </div>

@@ -56,12 +56,12 @@ function TicketDetailDrawer({ ticket, onClose, workzoneSummary = [] }) {
               <strong>{ticket.team || '-'}</strong>
             </div>
             <div className="detail-card">
-              <span>Layanan</span>
-              <strong>{ticket.serviceType || '-'}</strong>
+              <span>Jenis Tiket</span>
+              <strong>{ticket.jenisTiket || '-'}</strong>
             </div>
             <div className="detail-card">
-              <span>Jenis tiket</span>
-              <strong>{ticket.jenisTiket || '-'}</strong>
+              <span>Service Type</span>
+              <strong>{ticket.serviceType || '-'}</strong>
             </div>
           </div>
         </div>

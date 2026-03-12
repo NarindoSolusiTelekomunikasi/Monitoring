@@ -16,7 +16,7 @@ function ImjasPage() {
   const { state } = useDashboard()
   const { data, loading, error } = useApiResource(
     () => getImjas(state.filters),
-    [state.filters.dateRange, state.filters.sto, state.filters.team, state.filters.status, state.filters.serviceType, state.filters.teknisi],
+    [state.filters.dateRange, state.filters.dateFrom, state.filters.dateTo, state.filters.sto, state.filters.team, state.filters.status, state.filters.serviceType, state.filters.teknisi],
   )
 
   if (loading && !data) {

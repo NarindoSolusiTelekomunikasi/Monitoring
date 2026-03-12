@@ -5,6 +5,8 @@ const DashboardContext = createContext(null)
 const initialState = {
   filters: {
     dateRange: 'all',
+    dateFrom: '',
+    dateTo: '',
     sto: 'all',
     team: 'all',
     status: 'all',

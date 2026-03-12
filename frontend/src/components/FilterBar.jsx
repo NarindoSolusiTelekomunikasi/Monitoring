@@ -56,6 +56,18 @@ function FilterSelect({ label, value, options, onChange }) {
   )
 }
 
+function DateRangeInputs({ dateFrom, dateTo, onDateFromChange, onDateToChange }) {
+  return (
+    <div className="filter-select filter-select--range">
+      <span>Range Tanggal</span>
+      <div className="date-range-inputs">
+        <input type="date" value={dateFrom} onChange={onDateFromChange} />
+        <input type="date" value={dateTo} onChange={onDateToChange} />
+      </div>
+    </div>
+  )
+}
+
 function StoMultiSelect({ value, options, onChange }) {
   const selectedValues = parseMultiValue(value)
   const stoOptions = options.filter((option) => option !== 'all')
@@ -93,6 +105,30 @@ function FilterBar({ title, description, options }) {
   const statusOptions = ['all', ...new Set([...(options.statuses ?? []), ...REQUIRED_STATUS_OPTIONS])]
   const stoOptions = useMemo(() => ['all', ...(options.stos ?? [])], [options.stos])
 
+  const handleDateRangeChange = (event) => {
+    const nextValue = event.target.value
+    setFilter('dateRange', nextValue)
+    if (nextValue !== 'custom') {
+      setFilter('dateFrom', '')
+      setFilter('dateTo', '')
+    }
+  }
+
+  const handleDateFromChange = (event) => {
+    setFilter('dateFrom', event.target.value)
+    setFilter('dateRange', 'custom')
+  }
+
+  const handleDateToChange = (event) => {
+    setFilter('dateTo', event.target.value)
+    setFilter('dateRange', 'custom')
+  }
+
+  const dateRangeOptions = [
+    ...(options.dateRanges ?? [{ value: 'all', label: 'Semua tanggal' }]),
+    { value: 'custom', label: 'Rentang manual' },
+  ]
+
   return (
     <section className="filter-bar panel">
       <div className="filter-bar__copy">
@@ -105,8 +141,14 @@ function FilterBar({ title, description, options }) {
         <FilterSelect
           label="Tanggal"
           value={state.filters.dateRange}
-          options={options.dateRanges ?? [{ value: 'all', label: 'Semua tanggal' }]}
-          onChange={(event) => setFilter('dateRange', event.target.value)}
+          options={dateRangeOptions}
+          onChange={handleDateRangeChange}
+        />
+        <DateRangeInputs
+          dateFrom={state.filters.dateFrom}
+          dateTo={state.filters.dateTo}
+          onDateFromChange={handleDateFromChange}
+          onDateToChange={handleDateToChange}
         />
         <StoMultiSelect value={state.filters.sto} options={stoOptions} onChange={(value) => setFilter('sto', value)} />
         <FilterSelect
