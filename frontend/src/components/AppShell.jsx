@@ -77,7 +77,7 @@ function AppShell() {
             Menu
           </button>
           <div>
-            <span className="eyebrow">NOC workspace</span>
+            <span className="eyebrow">Narindo Solusi Telekomunikasi</span>
             <strong>{meta.title}</strong>
           </div>
         </header>
