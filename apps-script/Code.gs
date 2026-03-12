@@ -9,6 +9,7 @@ const CONFIG = {
 const SHEET_CONFIG = {
   DATABASE_RAW: { headerRow: 0 },
   TEAM_MASTER: { headerRow: 0 },
+  TEKNISI_NARINDO: { headerRow: 0 },
   TEAM_PERFORMANCE: { headerRow: 0 },
   STO_COMMAND_CENTER: { headerRow: 0 },
   RANKING_TEAM: { headerRow: 0 },
@@ -404,13 +405,33 @@ function buildTeamLookup(teamMasterRows) {
 }
 
 function countMasterTechnicians(teamMasterRows, filters) {
+  return countTechniciansNarindo(
+    teamMasterRows.reduce(function (allRows, row) {
+      const mappedRows = [row.teknisi_1, row.teknisi_2]
+        .map(function (teknisi) {
+          return {
+            sto: normalizeText(row.sto),
+            team: normalizeText(row.nama_team),
+            teknisi: technicianDisplayName(teknisi),
+          }
+        })
+        .filter(function (item) {
+          return item.teknisi
+        })
+      return allRows.concat(mappedRows)
+    }, []),
+    filters,
+  )
+}
+
+function countTechniciansNarindo(teknisiNarindoRows, filters) {
   const selectedStos = parseFilterValues(filters.sto)
   const selectedTeams = parseFilterValues(filters.team)
   const technicians = new Set()
 
-  teamMasterRows.forEach(function (row) {
+  teknisiNarindoRows.forEach(function (row) {
     const sto = normalizeText(row.sto)
-    const team = normalizeText(row.nama_team)
+    const team = normalizeText(row.team)
     const stoMatches = selectedStos.length === 0 || selectedStos.indexOf(sto) >= 0
     const teamMatches = selectedTeams.length === 0 || selectedTeams.indexOf(team) >= 0
 
@@ -418,12 +439,10 @@ function countMasterTechnicians(teamMasterRows, filters) {
       return
     }
 
-    ;[row.teknisi_1, row.teknisi_2]
-      .map(technicianDisplayName)
-      .filter(Boolean)
-      .forEach(function (name) {
-        technicians.add(name)
-      })
+    const teknisi = technicianDisplayName(row.teknisi || row.teknisiRaw)
+    if (teknisi) {
+      technicians.add(teknisi)
+    }
   })
 
   return technicians.size
@@ -437,6 +456,16 @@ function loadSpreadsheetData() {
   const spreadsheet = getSpreadsheet()
   const teamMaster = mapSheetObjects(spreadsheet, 'TEAM_MASTER')
   const teamLookup = buildTeamLookup(teamMaster)
+  const teknisiNarindo = mapSheetObjects(spreadsheet, 'TEKNISI_NARINDO').map(function (row) {
+    const technicianName = technicianDisplayName(row.teknisi)
+    const teamInfo = teamLookup.get(technicianName.toUpperCase()) || null
+    return {
+      sto: normalizeText(row.sto),
+      teknisiRaw: normalizeText(row.teknisi),
+      teknisi: technicianName,
+      team: teamInfo ? teamInfo.team : null,
+    }
+  })
   const rawTickets = getDatabaseRawRows(spreadsheet).map(function (row) {
     const technicianName = technicianDisplayName(row.teknisiRaw)
     const teamInfo = teamLookup.get(technicianName.toUpperCase()) || null
@@ -539,6 +568,7 @@ function loadSpreadsheetData() {
 
   RUNTIME_SPREADSHEET_DATA = {
     teamMaster: teamMaster,
+    teknisiNarindo: teknisiNarindo,
     rawTickets: rawTickets,
     teamPerformance: teamPerformance,
     stoCommandCenter: stoCommandCenter,
@@ -741,6 +771,7 @@ function getHealthData() {
     counts: {
       rawTickets: data.rawTickets.length,
       teamMaster: data.teamMaster.length,
+      teknisiNarindo: data.teknisiNarindo.length,
       imjas: data.imjas.length,
       unspec: data.unspec.length,
     },
@@ -817,7 +848,7 @@ function getDashboardData(filters) {
   return {
     generatedAt: new Date().toISOString(),
     kpis: summary.kpis,
-    totalMasterTechnicians: countMasterTechnicians(data.teamMaster, filters),
+    totalMasterTechnicians: countTechniciansNarindo(data.teknisiNarindo, filters),
     stoSummary: summary.stoSummary,
     topTeams: teamSummary.teams.slice(0, 6),
     topTechnicians: teamSummary.technicians.slice(0, 6),

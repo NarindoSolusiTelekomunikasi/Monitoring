@@ -57,7 +57,7 @@ function DashboardPage() {
         <KpiCard label="Total Tiket" value={kpis.totalTickets} trend="Total tiket open dan close." badge="Workbook live" tone="total" />
         <KpiCard label="Tiket Open" value={kpis.openTickets} trend="Total open tiket seluruh STO." badge="Perlu pantau" tone="open" />
         <KpiCard label="Tiket Close" value={kpis.closeTickets} trend={`${kpis.closeRate}% close rate`} badge="Selesai" tone="close" />
-        <KpiCard label="Total Teknisi Narindo" value={totalMasterTechnicians} trend="Total teknisi berdasarkan TEAM_MASTER." badge="Team lapangan" tone="warning" />
+        <KpiCard label="Total Teknisi Narindo" value={totalMasterTechnicians} trend="Total teknisi berdasarkan TEKNISI_NARINDO." badge="Team lapangan" tone="warning" />
       </section>
 
       <section className="analytics-grid">
