@@ -9,7 +9,7 @@ const CONFIG = {
 
 const SHEET_CONFIG = {
   DATABASE_RAW: { headerRow: 0 },
-  ManualDATABASE: { headerRow: 0 },
+  DATABASE_CLEAN: { headerRow: 0 },
   TEAM_MASTER: { headerRow: 0 },
   TEKNISI_NARINDO: { headerRow: 0 },
   TEAM_PERFORMANCE: { headerRow: 0 },
@@ -27,7 +27,7 @@ const FILTER_DATE_RANGES = {
 }
 
 const STATUS_OPTIONS = ['OPEN', 'CLOSE SYSTEM', 'CLOSE HD', 'CLOSE MYI']
-const TICKET_SOURCE_SHEET = 'ManualDATABASE'
+const TICKET_SOURCE_SHEET = 'DATABASE_CLEAN'
 const JAKARTA_OFFSET_MS = 7 * 60 * 60 * 1000
 let RUNTIME_SPREADSHEET_DATA = null
 let RUNTIME_FILTER_OPTIONS = null
