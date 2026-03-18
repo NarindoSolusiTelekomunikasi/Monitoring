@@ -1027,6 +1027,11 @@ tbody tr {
   margin-top: 0.9rem;
 }
 
+.team-card__stats--detail {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  margin-top: 0.75rem;
+}
+
 .team-card p {
   margin-top: 0.8rem;
 }

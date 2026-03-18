@@ -191,6 +191,32 @@ function DashboardPage() {
                     <strong>{team.total}</strong>
                   </div>
                 </div>
+                <div className="team-card__stats team-card__stats--detail">
+                  <div>
+                    <span>Close Reguler</span>
+                    <strong>{team.closeReguler ?? 0}</strong>
+                  </div>
+                  <div>
+                    <span>Close SQM</span>
+                    <strong>{team.closeSqm ?? 0}</strong>
+                  </div>
+                  <div>
+                    <span>Close UNSPEC</span>
+                    <strong>{team.closeUnspec ?? 0}</strong>
+                  </div>
+                  <div>
+                    <span>Open Reguler</span>
+                    <strong>{team.openReguler ?? 0}</strong>
+                  </div>
+                  <div>
+                    <span>Open SQM</span>
+                    <strong>{team.openSqm ?? 0}</strong>
+                  </div>
+                  <div>
+                    <span>Sisa UNSPEC</span>
+                    <strong>{team.sisaUnspec ?? 0}</strong>
+                  </div>
+                </div>
                 <p>Top performer: {team.topPerformer || '-'}</p>
               </article>
             ))}
@@ -217,6 +243,22 @@ function DashboardPage() {
             <div>
               <span>Open load</span>
               <strong>{topTeam?.open ?? 0}</strong>
+            </div>
+            <div>
+              <span>Close Reguler</span>
+              <strong>{topTeam?.closeReguler ?? 0}</strong>
+            </div>
+            <div>
+              <span>Close SQM</span>
+              <strong>{topTeam?.closeSqm ?? 0}</strong>
+            </div>
+            <div>
+              <span>Close UNSPEC</span>
+              <strong>{topTeam?.closeUnspec ?? 0}</strong>
+            </div>
+            <div>
+              <span>Sisa UNSPEC</span>
+              <strong>{topTeam?.sisaUnspec ?? 0}</strong>
             </div>
           </div>
         </article>
