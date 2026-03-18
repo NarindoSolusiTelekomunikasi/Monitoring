@@ -30,7 +30,13 @@ const pageMeta = {
 }
 
 const defaultOptions = {
-  dateRanges: [{ value: 'all', label: 'Semua tanggal' }],
+  dateRanges: [
+    { value: 'all', label: 'Semua tanggal' },
+    { value: 'today', label: 'Hari ini' },
+    { value: 'yesterday', label: 'Kemarin' },
+    { value: '7d', label: '7 hari terakhir' },
+    { value: '30d', label: '30 hari terakhir' },
+  ],
   stos: ['all'],
   teams: ['all'],
   teknisis: ['all'],

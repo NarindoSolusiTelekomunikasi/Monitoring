@@ -16,6 +16,7 @@ const SHEET_CONFIG = {
 
 const FILTER_DATE_RANGES = {
   today: 0,
+  yesterday: 1,
   '7d': 7,
   '30d': 30,
 }
@@ -407,6 +408,8 @@ function matchesDate(ticketDate, filters) {
       if (diff == null || diff < 0) return false
       if (filters.dateRange === 'today') {
         if (diff !== 0) return false
+      } else if (filters.dateRange === 'yesterday') {
+        if (diff !== 1) return false
       } else if (diff >= days) {
         return false
       }
@@ -715,6 +718,7 @@ export async function getFilterOptions() {
     dateRanges: [
       { value: 'all', label: 'Semua tanggal' },
       { value: 'today', label: 'Hari ini' },
+      { value: 'yesterday', label: 'Kemarin' },
       { value: '7d', label: '7 hari terakhir' },
       { value: '30d', label: '30 hari terakhir' },
     ],
