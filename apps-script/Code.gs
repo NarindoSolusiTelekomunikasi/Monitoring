@@ -4,7 +4,7 @@ const CONFIG = {
     '1xKFr7vfaEltmSJu6UAodKBqk-fdST8I9vEU-fyC1xLM',
   cacheTtlSeconds: 60,
   filtersCacheTtlSeconds: 300,
-  cacheVersion: '2026-03-18-1',
+  cacheVersion: '2026-03-18-2',
 }
 
 const SHEET_CONFIG = {
