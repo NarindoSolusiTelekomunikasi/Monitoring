@@ -1,4 +1,4 @@
-import { useMemo } from 'react'
+import { useEffect, useState, useMemo } from 'react'
 import { useDashboard } from '../context/DashboardContext'
 
 const allLabels = {
@@ -102,8 +102,19 @@ function StoMultiSelect({ value, options, onChange }) {
 
 function FilterBar({ title, description, options }) {
   const { state, setFilter, resetFilters } = useDashboard()
+  const [isCompact, setIsCompact] = useState(false)
   const statusOptions = ['all', ...new Set([...(options.statuses ?? []), ...REQUIRED_STATUS_OPTIONS])]
   const stoOptions = useMemo(() => ['all', ...(options.stos ?? [])], [options.stos])
+
+  useEffect(() => {
+    const handleScroll = () => {
+      setIsCompact(window.scrollY > 32)
+    }
+
+    handleScroll()
+    window.addEventListener('scroll', handleScroll, { passive: true })
+    return () => window.removeEventListener('scroll', handleScroll)
+  }, [])
 
   const handleDateRangeChange = (event) => {
     const nextValue = event.target.value
@@ -130,7 +141,7 @@ function FilterBar({ title, description, options }) {
   ]
 
   return (
-    <section className="filter-bar panel">
+    <section className={`filter-bar panel ${isCompact ? 'filter-bar--compact' : ''}`}>
       <div className="filter-bar__copy">
         <span className="eyebrow">Filter Control</span>
         <h2>{title}</h2>
