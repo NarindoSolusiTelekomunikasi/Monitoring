@@ -147,7 +147,7 @@ function DashboardPage() {
           <div className="section-heading">
             <div>
               <h2>Ranking Teknisi</h2>
-              <p>Top performansi teknisi berdasarkan jumlah tiket yang diselesaikan.</p>
+              <p>Top performansi teknisi berdasarkan akumulasi close tiket reguler dan SQM.</p>
             </div>
           </div>
           <RankingList items={topTechnicians.slice(0, 4)} compact />
@@ -159,7 +159,7 @@ function DashboardPage() {
           <div className="section-heading">
             <div>
               <h2>Performansi Team Hari Ini.</h2>
-              <p>Top performansi team berdasarkan jumlah tiket yang diselesaikan.</p>
+              <p>Top performansi team dari akumulasi tiket reguler, tiket SQM, dan pekerjaan unspec.</p>
             </div>
           </div>
 
@@ -202,7 +202,7 @@ function DashboardPage() {
           <h2>{topTeam ? topTeam.team : 'Belum ada team aktif'}</h2>
           <p>
             {topTeam
-              ? `${topTeam.team} memimpin dengan ${topTeam.close} close ticket dan produktivitas ${topTeam.productivity}%.`
+              ? `${topTeam.team} memimpin dengan ${topTeam.close} close pekerjaan gabungan dan produktivitas ${topTeam.productivity}%.`
               : 'Gunakan filter yang lebih luas untuk melihat performa team.'}
           </p>
           <div className="spotlight-metrics">

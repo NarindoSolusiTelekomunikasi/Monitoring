@@ -47,7 +47,7 @@ function TeamsPage() {
           <div className="section-heading">
             <div>
               <h2>Team Rankings</h2>
-              <p>Produktivitas Team.</p>
+              <p>Produktivitas team dari akumulasi tiket reguler, tiket SQM, dan pekerjaan unspec.</p>
             </div>
           </div>
 
@@ -96,7 +96,7 @@ function TeamsPage() {
           <div className="section-heading">
             <div>
               <h2>Technician Leaderboard</h2>
-              <p>Performa teknisi teratas berdasarkan close ticket.</p>
+              <p>Performa teknisi teratas berdasarkan akumulasi close tiket reguler dan SQM.</p>
             </div>
           </div>
           <RankingList items={technicians.slice(0, 6)} />
