@@ -64,7 +64,7 @@ p {
   min-height: 100vh;
   display: grid;
   grid-template-columns: 300px minmax(0, 1fr);
-  overflow: hidden;
+  overflow-x: hidden;
 }
 
 .background-grid,
@@ -227,6 +227,7 @@ p {
 .app-content {
   min-width: 0;
   padding: 24px;
+  --filter-sticky-top: 16px;
 }
 
 .mobile-topbar {
@@ -244,8 +245,9 @@ p {
 }
 
 .filter-bar {
-  position: relative;
-  z-index: 12;
+  position: sticky;
+  top: var(--filter-sticky-top);
+  z-index: 20;
   overflow: visible;
   display: grid;
   grid-template-columns: minmax(260px, 1fr) minmax(0, 2fr) auto;
@@ -1169,6 +1171,7 @@ tbody tr {
 
   .app-content {
     padding: 18px;
+    --filter-sticky-top: 12px;
   }
 
   .mobile-topbar {
