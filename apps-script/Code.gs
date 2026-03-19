@@ -4,7 +4,7 @@ const CONFIG = {
     '1xKFr7vfaEltmSJu6UAodKBqk-fdST8I9vEU-fyC1xLM',
   cacheTtlSeconds: 60,
   filtersCacheTtlSeconds: 300,
-  cacheVersion: '2026-03-19-1',
+  cacheVersion: '2026-03-19-2',
 }
 
 const SHEET_CONFIG = {
@@ -495,19 +495,6 @@ function loadSpreadsheetData() {
     }
   })
 
-  const teamPerformance = mapSheetObjects(spreadsheet, 'TEAM_PERFORMANCE').map(function (row) {
-    return {
-      sto: normalizeText(row.sto),
-      team: normalizeText(row.team),
-      openReguler: toNumber(row.open_reguler),
-      openSqm: toNumber(row.open_sqm),
-      closeReguler: toNumber(row.close_reguler),
-      closeSqm: toNumber(row.close_sqm),
-      totalOpen: toNumber(row.total_open),
-      totalClose: toNumber(row.total_close),
-    }
-  })
-
   const stoCommandCenter = mapSheetObjects(spreadsheet, 'STO_COMMAND_CENTER').map(function (row) {
     return {
       sto: normalizeText(row.sto),
@@ -575,7 +562,6 @@ function loadSpreadsheetData() {
     teamMaster: teamMaster,
     teknisiNarindo: teknisiNarindo,
     rawTickets: rawTickets,
-    teamPerformance: teamPerformance,
     stoCommandCenter: stoCommandCenter,
     rankingTeams: rankingTeams,
     rankingTechnicians: rankingTechnicians,
@@ -835,32 +821,15 @@ function buildTechnicianDirectory(teknisiNarindoRows) {
 }
 
 function summarizeAggregatedPerformance(data, filters) {
-  const technicianDirectory = buildTechnicianDirectory(data.teknisiNarindo)
-  const technicians = filterByCommonFields(
-    data.rankingTechnicians.map(function (item) {
-      const technicianInfo = technicianDirectory.get(item.teknisi.toUpperCase()) || null
-      return Object.assign({}, item, {
-        sto: technicianInfo ? technicianInfo.sto : '',
-        team: technicianInfo ? technicianInfo.team : '',
-        close: item.totalClose,
-        total: item.totalClose,
-      })
+  const filteredTickets = filterByCommonFields(
+    data.rawTickets.filter(function (ticket) {
+      return matchesDate(ticket.tanggal, filters)
     }),
     filters,
-    ['teknisi', 'team', 'sto'],
-  ).sort(function (left, right) {
-    return right.totalClose - left.totalClose || right.closeSqm - left.closeSqm || left.teknisi.localeCompare(right.teknisi)
-  })
-
-  const topTechnicianByTeam = new Map()
-  technicians.forEach(function (item) {
-    if (!item.team || topTechnicianByTeam.has(item.team)) {
-      return
-    }
-    topTechnicianByTeam.set(item.team, item.teknisi)
-  })
-
+    ['incident', 'summary', 'contactName', 'teknisi', 'jenisTiket', 'serviceType', 'sto'],
+  )
   const teamsByKey = new Map()
+  const techniciansByKey = new Map()
   const applyTeamWorklog = function (key, payload) {
     const current = teamsByKey.get(key) || {
       sto: payload.sto,
@@ -890,18 +859,72 @@ function summarizeAggregatedPerformance(data, filters) {
     teamsByKey.set(key, current)
   }
 
-  filterByCommonFields(data.teamPerformance, filters, ['sto', 'team']).forEach(function (item) {
-    const key = `${item.sto}::${item.team}`
-    applyTeamWorklog(key, {
-      sto: item.sto,
-      team: item.team,
-      open: item.totalOpen,
-      close: item.totalClose,
-      openReguler: item.openReguler,
-      openSqm: item.openSqm,
-      closeReguler: item.closeReguler,
-      closeSqm: item.closeSqm,
+  filteredTickets.forEach(function (ticket) {
+    const isClosed = isClosedStatus(ticket.status)
+    const isSqm = ticket.jenisTiket === '2. SQM'
+    const teamKey = `${ticket.sto}::${ticket.team || ''}`
+    const technicianKey = `${ticket.sto}::${ticket.team || ''}::${ticket.teknisi || ''}`
+
+    if (ticket.teknisi) {
+      const currentTech = techniciansByKey.get(technicianKey) || {
+        teknisi: ticket.teknisi,
+        sto: ticket.sto,
+        team: ticket.team || '',
+        open: 0,
+        close: 0,
+        total: 0,
+        closeReg: 0,
+        closeSqm: 0,
+        totalClose: 0,
+      }
+
+      currentTech.total += 1
+      if (isClosed) {
+        currentTech.close += 1
+        currentTech.totalClose += 1
+        if (isSqm) {
+          currentTech.closeSqm += 1
+        } else {
+          currentTech.closeReg += 1
+        }
+      } else {
+        currentTech.open += 1
+      }
+      techniciansByKey.set(technicianKey, currentTech)
+    }
+
+    if (!ticket.team) {
+      return
+    }
+
+    applyTeamWorklog(teamKey, {
+      sto: ticket.sto,
+      team: ticket.team,
+      open: isClosed ? 0 : 1,
+      close: isClosed ? 1 : 0,
+      openReguler: !isClosed && !isSqm ? 1 : 0,
+      openSqm: !isClosed && isSqm ? 1 : 0,
+      closeReguler: isClosed && !isSqm ? 1 : 0,
+      closeSqm: isClosed && isSqm ? 1 : 0,
     })
+  })
+
+  const technicians = Array.from(techniciansByKey.values())
+    .map(function (item) {
+      return Object.assign({}, item, {
+        productivity: item.total ? Math.round((item.close / item.total) * 100) : 0,
+      })
+    })
+    .sort(function (left, right) {
+      return right.close - left.close || right.closeSqm - left.closeSqm || left.teknisi.localeCompare(right.teknisi)
+    })
+
+  const topTechnicianByTeam = new Map()
+  technicians.forEach(function (item) {
+    if (!item.team || topTechnicianByTeam.has(item.team)) {
+      return
+    }
+    topTechnicianByTeam.set(item.team, item.teknisi)
   })
 
   filterByCommonFields(data.unspec, filters, ['sto', 'team', 'kendala']).forEach(function (item) {
@@ -987,11 +1010,6 @@ function getFilterOptions() {
           }),
         )
         .concat(
-          data.teamPerformance.map(function (item) {
-            return item.sto
-          }),
-        )
-        .concat(
           data.stoCommandCenter.map(function (item) {
             return item.sto
           }),
@@ -1021,11 +1039,6 @@ function getFilterOptions() {
         )
         .concat(
           data.teknisiNarindo.map(function (item) {
-            return item.team
-          }),
-        )
-        .concat(
-          data.teamPerformance.map(function (item) {
             return item.team
           }),
         )
@@ -1133,7 +1146,6 @@ function getTeamData(filters) {
     teams: aggregatedPerformance.teams,
     technicians: aggregatedPerformance.technicians,
     commandCenter: filterByCommonFields(data.stoCommandCenter, filters, ['sto', 'team']),
-    teamPerformance: filterByCommonFields(data.teamPerformance, filters, ['sto', 'team']),
   }
 }
 
