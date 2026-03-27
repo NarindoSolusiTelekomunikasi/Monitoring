@@ -1,0 +1,6 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" role="img" aria-label="Narindo">
+  <rect width="64" height="64" rx="14" fill="#f6f8fc"/>
+  <circle cx="24" cy="32" r="14" fill="#2f3138"/>
+  <circle cx="40" cy="32" r="14" fill="#a12626"/>
+  <circle cx="32" cy="32" r="8" fill="#f6f8fc"/>
+</svg>
