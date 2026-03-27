@@ -47,7 +47,7 @@ const defaultOptions = {
 
 function AppShell() {
   const location = useLocation()
-  const { state, toggleMobileNav, closeMobileNav, resetFilters } = useDashboard()
+  const { state, toggleMobileNav, closeMobileNav, resetFilters, toggleTheme } = useDashboard()
   const meta = pageMeta[location.pathname] ?? pageMeta['/']
   const { data } = useApiResource(() => getFilters(), [], { refreshMs: 300000 })
   const { data: health } = useApiResource(() => getHealth(), [], { refreshMs: 60000 })
@@ -74,6 +74,8 @@ function AppShell() {
         activeFilters={activeFilters}
         onResetFilters={resetFilters}
         health={health}
+        theme={state.theme}
+        onToggleTheme={toggleTheme}
       />
 
       {state.mobileNavOpen ? <button className="mobile-overlay" onClick={closeMobileNav} aria-label="Tutup sidebar" /> : null}
@@ -90,6 +92,9 @@ function AppShell() {
             <span className="eyebrow">Narindo Solusi Telekomunikasi</span>
             <strong>{meta.title}</strong>
           </div>
+          <button type="button" className="theme-toggle theme-toggle--mobile" onClick={toggleTheme}>
+            {state.theme === 'dark' ? 'Light' : 'Dark'}
+          </button>
         </header>
 
         <FilterBar title={meta.title} description={meta.description} options={options} />

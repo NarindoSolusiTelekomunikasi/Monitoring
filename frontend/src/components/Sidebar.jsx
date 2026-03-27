@@ -29,14 +29,19 @@ function getSourceLabel(source) {
   return source.type
 }
 
-function Sidebar({ mobileOpen, onClose, activeFilters, onResetFilters, health }) {
+function Sidebar({ mobileOpen, onClose, activeFilters, onResetFilters, health, theme, onToggleTheme }) {
   const source = health?.source ?? null
   const counts = health?.counts ?? null
 
   return (
     <aside className={`sidebar ${mobileOpen ? 'sidebar--open' : ''}`}>
       <div className="sidebar__brand">
-        <NarindoLogo className="sidebar__brand-logo" />
+        <div className="sidebar__brand-head">
+          <NarindoLogo className="sidebar__brand-logo" />
+          <button type="button" className="theme-toggle" onClick={onToggleTheme}>
+            {theme === 'dark' ? 'Light mode' : 'Dark mode'}
+          </button>
+        </div>
         <div>
           <h1>Narindo Solusi Telekomunikasi</h1>
           <p>Dashboard Narindo for ticket monitoring, IMJAS, UNSPEC, and team performansi.</p>
