@@ -16,7 +16,7 @@ function NarindoLogo({ className = '', compact = false }) {
       <circle cx="15" cy="22" r="11" fill="#2F3138" />
       <circle cx="29" cy="22" r="11" fill="#A12626" />
       <circle cx="22" cy="22" r="6.3" fill="#F4F7FB" />
-      <text x="51" y="28" fill="#D6DEE8" fontFamily="IBM Plex Sans, Arial, sans-serif" fontSize="17" fontWeight="700" letterSpacing="0.3">
+      <text x="51" y="28" fill="currentColor" fontFamily="IBM Plex Sans, Arial, sans-serif" fontSize="17" fontWeight="700" letterSpacing="0.3">
         narindo
       </text>
     </svg>
