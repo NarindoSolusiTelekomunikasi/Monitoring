@@ -1,4 +1,5 @@
 import { NavLink } from 'react-router-dom'
+import NarindoLogo from './NarindoLogo'
 
 const navItems = [
   { to: '/', label: 'Dashboard', end: true },
@@ -35,7 +36,7 @@ function Sidebar({ mobileOpen, onClose, activeFilters, onResetFilters, health })
   return (
     <aside className={`sidebar ${mobileOpen ? 'sidebar--open' : ''}`}>
       <div className="sidebar__brand">
-        <span className="chip">NST</span>
+        <NarindoLogo className="sidebar__brand-logo" />
         <div>
           <h1>Narindo Solusi Telekomunikasi</h1>
           <p>Dashboard Narindo for ticket monitoring, IMJAS, UNSPEC, and team performansi.</p>

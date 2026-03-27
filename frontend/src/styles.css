@@ -134,6 +134,12 @@ p {
   padding: 20px;
 }
 
+.sidebar__brand-logo {
+  display: block;
+  width: min(156px, 100%);
+  height: auto;
+}
+
 .sidebar__brand h1 {
   margin-top: 0.8rem;
   font-family: 'Space Grotesk', sans-serif;
@@ -232,6 +238,21 @@ p {
 
 .mobile-topbar {
   display: none;
+}
+
+.mobile-topbar__brand {
+  display: flex;
+  align-items: center;
+}
+
+.mobile-topbar__logo {
+  display: block;
+  width: 118px;
+  height: auto;
+}
+
+.mobile-topbar__copy {
+  min-width: 0;
 }
 
 .filter-bar,

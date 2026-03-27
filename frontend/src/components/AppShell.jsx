@@ -4,6 +4,7 @@ import { useDashboard } from '../context/DashboardContext'
 import { getFilters, getHealth } from '../data/api'
 import useApiResource from '../hooks/useApiResource'
 import FilterBar from './FilterBar'
+import NarindoLogo from './NarindoLogo'
 import Sidebar from './Sidebar'
 
 const pageMeta = {
@@ -82,7 +83,10 @@ function AppShell() {
           <button type="button" className="menu-button" onClick={toggleMobileNav}>
             Menu
           </button>
-          <div>
+          <div className="mobile-topbar__brand">
+            <NarindoLogo className="mobile-topbar__logo" compact />
+          </div>
+          <div className="mobile-topbar__copy">
             <span className="eyebrow">Narindo Solusi Telekomunikasi</span>
             <strong>{meta.title}</strong>
           </div>
