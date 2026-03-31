@@ -342,12 +342,9 @@ async function loadWorkbookData() {
     const closeSqm = readNumberFromRow(row, ['close_sqm', 'closesqm'])
     const openUnspec = readNumberFromRow(row, ['open_unspec', 'openunspec', 'unspec_open'])
     const closeUnspec = readNumberFromRow(row, ['close_unspec', 'closeunspec', 'unspec_close'])
-    const sisaUnspec = readNumberFromRow(row, ['sisa_unspec', 'sisaunspec', 'unspec_remaining'], openUnspec - closeUnspec)
-    const totalOpenFallback = openReg + openSqm + openUnspec
-    const totalCloseFallback = closeReg + closeSqm + closeUnspec
-    const totalOpen = readNumberFromRow(row, ['total_open', 'opentotal'], totalOpenFallback)
-    const totalClose = readNumberFromRow(row, ['total_close', 'closetotal'], totalCloseFallback)
-    const productivityFallback = totalOpen + totalClose ? Math.round((totalClose / (totalOpen + totalClose)) * 100) : 0
+    const sisaUnspec = readNumberFromRow(row, ['sisa_unspec', 'sisaunspec', 'unspec_remaining'])
+    const totalOpen = readNumberFromRow(row, ['total_open', 'opentotal'])
+    const totalClose = readNumberFromRow(row, ['total_close', 'closetotal'])
 
     return {
       sto: normalizeText(row.sto),
@@ -361,7 +358,7 @@ async function loadWorkbookData() {
       sisaUnspec,
       totalOpen,
       totalClose,
-      productivity: readNumberFromRow(row, ['productivity', 'produktifitas', 'produktivity', 'produktvitas'], productivityFallback),
+      productivity: readNumberFromRow(row, ['productivity', 'produktifitas', 'produktivity', 'produktvitas']),
     }
   })
 

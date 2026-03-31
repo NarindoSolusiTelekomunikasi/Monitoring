@@ -512,13 +512,9 @@ function loadSpreadsheetData() {
     var closeSqm = readNumberFromRow(row, ['close_sqm', 'closesqm'])
     var openUnspec = readNumberFromRow(row, ['open_unspec', 'openunspec', 'unspec_open'])
     var closeUnspec = readNumberFromRow(row, ['close_unspec', 'closeunspec', 'unspec_close'])
-    var sisaUnspec = readNumberFromRow(row, ['sisa_unspec', 'sisaunspec', 'unspec_remaining'], openUnspec - closeUnspec)
-
-    var totalOpenFallback = openReg + openSqm + openUnspec
-    var totalCloseFallback = closeReg + closeSqm + closeUnspec
-    var totalOpen = readNumberFromRow(row, ['total_open', 'opentotal'], totalOpenFallback)
-    var totalClose = readNumberFromRow(row, ['total_close', 'closetotal'], totalCloseFallback)
-    var productivityFallback = totalOpen + totalClose ? Math.round((totalClose / (totalOpen + totalClose)) * 100) : 0
+    var sisaUnspec = readNumberFromRow(row, ['sisa_unspec', 'sisaunspec', 'unspec_remaining'])
+    var totalOpen = readNumberFromRow(row, ['total_open', 'opentotal'])
+    var totalClose = readNumberFromRow(row, ['total_close', 'closetotal'])
 
     return {
       sto: normalizeText(row.sto),
@@ -532,7 +528,7 @@ function loadSpreadsheetData() {
       sisaUnspec: sisaUnspec,
       totalOpen: totalOpen,
       totalClose: totalClose,
-      productivity: readNumberFromRow(row, ['productivity', 'produktifitas', 'produktivity', 'produktvitas'], productivityFallback),
+      productivity: readNumberFromRow(row, ['productivity', 'produktifitas', 'produktivity', 'produktvitas']),
     }
   })
 
