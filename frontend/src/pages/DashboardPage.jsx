@@ -43,7 +43,27 @@ function DashboardPage() {
     closeTickets: 0,
     activeTechnicians: 0,
     closeRate: 0,
+    breakdown: {
+      totalReguler: 0,
+      totalSqm: 0,
+      openReguler: 0,
+      openSqm: 0,
+      closeReguler: 0,
+      closeSqm: 0,
+    },
   }
+  const breakdown = {
+    totalReguler: kpis.breakdown?.totalReguler ?? 0,
+    totalSqm: kpis.breakdown?.totalSqm ?? 0,
+    openReguler: kpis.breakdown?.openReguler ?? 0,
+    openSqm: kpis.breakdown?.openSqm ?? 0,
+    closeReguler: kpis.breakdown?.closeReguler ?? 0,
+    closeSqm: kpis.breakdown?.closeSqm ?? 0,
+  }
+
+  const totalTicketDetail = `Reguler ${breakdown.totalReguler} • SQM ${breakdown.totalSqm}`
+  const openTicketDetail = `Reguler ${breakdown.openReguler} • SQM ${breakdown.openSqm}`
+  const closeTicketDetail = `Reguler ${breakdown.closeReguler} • SQM ${breakdown.closeSqm}`
   const totalMasterTechnicians = data?.totalMasterTechnicians ?? 0
   const stoSummary = data?.stoSummary ?? []
   const topTeams = data?.topTeams ?? []
@@ -56,9 +76,30 @@ function DashboardPage() {
   return (
     <div className="page-stack">
       <section className="kpi-grid">
-        <KpiCard label="Total Tiket" value={kpis.totalTickets} trend="Total tiket open dan close." badge="Workbook live" tone="total" />
-        <KpiCard label="Tiket Open" value={kpis.openTickets} trend="Total open tiket seluruh STO." badge="Perlu pantau" tone="open" />
-        <KpiCard label="Tiket Close" value={kpis.closeTickets} trend={`${kpis.closeRate}% close rate`} badge="Selesai" tone="close" />
+        <KpiCard
+          label="Total Tiket"
+          value={kpis.totalTickets}
+          trend="Total tiket open dan close."
+          detail={totalTicketDetail}
+          badge="Workbook live"
+          tone="total"
+        />
+        <KpiCard
+          label="Tiket Open"
+          value={kpis.openTickets}
+          trend="Total open tiket seluruh STO."
+          detail={openTicketDetail}
+          badge="Perlu pantau"
+          tone="open"
+        />
+        <KpiCard
+          label="Tiket Close"
+          value={kpis.closeTickets}
+          trend={`${kpis.closeRate}% close rate`}
+          detail={closeTicketDetail}
+          badge="Selesai"
+          tone="close"
+        />
         <KpiCard label="Total Teknisi Narindo" value={totalMasterTechnicians} trend="Teknisi aktif." badge="Team lapangan" tone="warning" />
       </section>
 

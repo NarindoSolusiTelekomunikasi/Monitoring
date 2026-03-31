@@ -490,15 +490,41 @@ function filterByCommonFields(items, filters, searchableFields = []) {
 
 function summarizeTickets(tickets) {
   const totalsBySto = new Map()
+  const breakdown = {
+    totalReguler: 0,
+    totalSqm: 0,
+    openReguler: 0,
+    openSqm: 0,
+    closeReguler: 0,
+    closeSqm: 0,
+  }
   tickets.forEach((ticket) => {
+    const isClosed = isClosedStatus(ticket.status)
+    const isSqm = ticket.jenisTiket === '2. SQM'
     const current = totalsBySto.get(ticket.sto) ?? { sto: ticket.sto, open: 0, close: 0, total: 0 }
     current.total += 1
-    if (isClosedStatus(ticket.status)) {
+    if (isClosed) {
       current.close += 1
     } else {
       current.open += 1
     }
     totalsBySto.set(ticket.sto, current)
+
+    if (isSqm) {
+      breakdown.totalSqm += 1
+      if (isClosed) {
+        breakdown.closeSqm += 1
+      } else {
+        breakdown.openSqm += 1
+      }
+    } else {
+      breakdown.totalReguler += 1
+      if (isClosed) {
+        breakdown.closeReguler += 1
+      } else {
+        breakdown.openReguler += 1
+      }
+    }
   })
   const totalTickets = tickets.length
   const closeTickets = tickets.filter((ticket) => isClosedStatus(ticket.status)).length
@@ -511,6 +537,7 @@ function summarizeTickets(tickets) {
       closeTickets,
       activeTechnicians,
       closeRate: totalTickets ? Math.round((closeTickets / totalTickets) * 100) : 0,
+      breakdown,
     },
     stoSummary: [...totalsBySto.values()].sort((a, b) => a.sto.localeCompare(b.sto)),
   }
