@@ -4,12 +4,13 @@ const CONFIG = {
     '1xKFr7vfaEltmSJu6UAodKBqk-fdST8I9vEU-fyC1xLM',
   cacheTtlSeconds: 60,
   filtersCacheTtlSeconds: 300,
-  cacheVersion: '2026-03-31-2',
+  cacheVersion: '2026-03-31-3',
 }
 
 const SHEET_CONFIG = {
   DATABASE_RAW: { headerRow: 0 },
   DATABASE_CLEAN: { headerRow: 0 },
+  ManualDATABASE: { headerRow: 0 },
   TEAM_MASTER: { headerRow: 0 },
   TEKNISI_NARINDO: { headerRow: 0 },
   TEAM_PERFORMANCE: { headerRow: 0 },
@@ -28,7 +29,7 @@ const FILTER_DATE_RANGES = {
 }
 
 const STATUS_OPTIONS = ['OPEN', 'CLOSE SYSTEM', 'CLOSE HD', 'CLOSE MYI']
-const TICKET_SOURCE_SHEET = 'DATABASE_CLEAN'
+const TICKET_SOURCE_SHEET = 'ManualDATABASE'
 const JAKARTA_OFFSET_MS = 7 * 60 * 60 * 1000
 let RUNTIME_SPREADSHEET_DATA = null
 let RUNTIME_FILTER_OPTIONS = null
@@ -642,6 +643,7 @@ function loadSpreadsheetData() {
     })
 
   RUNTIME_SPREADSHEET_DATA = {
+    ticketSourceSheet: TICKET_SOURCE_SHEET,
     teamMaster: teamMaster,
     teknisiNarindo: teknisiNarindo,
     rawTickets: rawTickets,
@@ -1045,7 +1047,7 @@ function getHealthData() {
   return {
     workbook: 'google-sheet-live',
     cacheVersion: CONFIG.cacheVersion,
-    ticketSourceSheet: TICKET_SOURCE_SHEET,
+    ticketSourceSheet: data.ticketSourceSheet,
     source: {
       type: 'google-apps-script',
       spreadsheetId: CONFIG.spreadsheetId,
