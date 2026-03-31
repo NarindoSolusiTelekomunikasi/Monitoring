@@ -88,7 +88,24 @@ function normalizeKey(value) {
 
 function toNumber(value) {
   if (value === '' || value == null) return 0
-  const numeric = Number(String(value).replace(/,/g, '.'))
+  let text = String(value).trim()
+  if (!text) return 0
+
+  text = text.replace(/\s+/g, '').replace(/%/g, '')
+  const commaIndex = text.lastIndexOf(',')
+  const dotIndex = text.lastIndexOf('.')
+
+  if (commaIndex >= 0 && dotIndex >= 0) {
+    if (commaIndex > dotIndex) {
+      text = text.replace(/\./g, '').replace(/,/g, '.')
+    } else {
+      text = text.replace(/,/g, '')
+    }
+  } else if (commaIndex >= 0) {
+    text = text.replace(/,/g, '.')
+  }
+
+  const numeric = Number(text)
   return Number.isFinite(numeric) ? numeric : 0
 }
 
