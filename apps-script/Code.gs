@@ -212,6 +212,16 @@ function toNumber(value) {
   return Number.isFinite(numeric) ? numeric : 0
 }
 
+function readNumberFromRow(row, keys, fallbackValue) {
+  for (var index = 0; index < keys.length; index += 1) {
+    var key = keys[index]
+    if (Object.prototype.hasOwnProperty.call(row, key) && row[key] !== '' && row[key] != null) {
+      return toNumber(row[key])
+    }
+  }
+  return fallbackValue == null ? 0 : fallbackValue
+}
+
 function toNullableText(value) {
   const normalized = normalizeText(value)
   return normalized || null
@@ -496,16 +506,33 @@ function loadSpreadsheetData() {
   })
 
   const stoCommandCenter = mapSheetObjects(spreadsheet, 'STO_COMMAND_CENTER').map(function (row) {
+    var openReg = readNumberFromRow(row, ['open_reg', 'openreg'])
+    var openSqm = readNumberFromRow(row, ['open_sqm', 'opensqm'])
+    var closeReg = readNumberFromRow(row, ['close_reg', 'closereg'])
+    var closeSqm = readNumberFromRow(row, ['close_sqm', 'closesqm'])
+    var openUnspec = readNumberFromRow(row, ['open_unspec', 'openunspec', 'unspec_open'])
+    var closeUnspec = readNumberFromRow(row, ['close_unspec', 'closeunspec', 'unspec_close'])
+    var sisaUnspec = readNumberFromRow(row, ['sisa_unspec', 'sisaunspec', 'unspec_remaining'], openUnspec - closeUnspec)
+
+    var totalOpenFallback = openReg + openSqm + openUnspec
+    var totalCloseFallback = closeReg + closeSqm + closeUnspec
+    var totalOpen = readNumberFromRow(row, ['total_open', 'opentotal'], totalOpenFallback)
+    var totalClose = readNumberFromRow(row, ['total_close', 'closetotal'], totalCloseFallback)
+    var productivityFallback = totalOpen + totalClose ? Math.round((totalClose / (totalOpen + totalClose)) * 100) : 0
+
     return {
       sto: normalizeText(row.sto),
       team: normalizeText(row.team),
-      openReg: toNumber(row.open_reg),
-      openSqm: toNumber(row.open_sqm),
-      closeReg: toNumber(row.close_reg),
-      closeSqm: toNumber(row.close_sqm),
-      totalOpen: toNumber(row.total_open),
-      totalClose: toNumber(row.total_close),
-      productivity: toNumber(row.productivity),
+      openReg: openReg,
+      openSqm: openSqm,
+      openUnspec: openUnspec,
+      closeReg: closeReg,
+      closeSqm: closeSqm,
+      closeUnspec: closeUnspec,
+      sisaUnspec: sisaUnspec,
+      totalOpen: totalOpen,
+      totalClose: totalClose,
+      productivity: readNumberFromRow(row, ['productivity', 'produktifitas', 'produktivity', 'produktvitas'], productivityFallback),
     }
   })
 

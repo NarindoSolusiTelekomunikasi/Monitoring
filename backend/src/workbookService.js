@@ -92,6 +92,15 @@ function toNumber(value) {
   return Number.isFinite(numeric) ? numeric : 0
 }
 
+function readNumberFromRow(row, keys, fallbackValue) {
+  for (const key of keys) {
+    if (Object.prototype.hasOwnProperty.call(row, key) && row[key] !== '' && row[key] != null) {
+      return toNumber(row[key])
+    }
+  }
+  return fallbackValue == null ? 0 : fallbackValue
+}
+
 function toNullableText(value) {
   const normalized = normalizeText(value)
   return normalized || null
@@ -326,17 +335,35 @@ async function loadWorkbookData() {
     }
   })
 
-  const stoCommandCenter = mapSheetObjects(workbook, 'STO_COMMAND_CENTER').map((row) => ({
-    sto: normalizeText(row.sto),
-    team: normalizeText(row.team),
-    openReg: toNumber(row.open_reg),
-    openSqm: toNumber(row.open_sqm),
-    closeReg: toNumber(row.close_reg),
-    closeSqm: toNumber(row.close_sqm),
-    totalOpen: toNumber(row.total_open),
-    totalClose: toNumber(row.total_close),
-    productivity: toNumber(row.productivity),
-  }))
+  const stoCommandCenter = mapSheetObjects(workbook, 'STO_COMMAND_CENTER').map((row) => {
+    const openReg = readNumberFromRow(row, ['open_reg', 'openreg'])
+    const openSqm = readNumberFromRow(row, ['open_sqm', 'opensqm'])
+    const closeReg = readNumberFromRow(row, ['close_reg', 'closereg'])
+    const closeSqm = readNumberFromRow(row, ['close_sqm', 'closesqm'])
+    const openUnspec = readNumberFromRow(row, ['open_unspec', 'openunspec', 'unspec_open'])
+    const closeUnspec = readNumberFromRow(row, ['close_unspec', 'closeunspec', 'unspec_close'])
+    const sisaUnspec = readNumberFromRow(row, ['sisa_unspec', 'sisaunspec', 'unspec_remaining'], openUnspec - closeUnspec)
+    const totalOpenFallback = openReg + openSqm + openUnspec
+    const totalCloseFallback = closeReg + closeSqm + closeUnspec
+    const totalOpen = readNumberFromRow(row, ['total_open', 'opentotal'], totalOpenFallback)
+    const totalClose = readNumberFromRow(row, ['total_close', 'closetotal'], totalCloseFallback)
+    const productivityFallback = totalOpen + totalClose ? Math.round((totalClose / (totalOpen + totalClose)) * 100) : 0
+
+    return {
+      sto: normalizeText(row.sto),
+      team: normalizeText(row.team),
+      openReg,
+      openSqm,
+      openUnspec,
+      closeReg,
+      closeSqm,
+      closeUnspec,
+      sisaUnspec,
+      totalOpen,
+      totalClose,
+      productivity: readNumberFromRow(row, ['productivity', 'produktifitas', 'produktivity', 'produktvitas'], productivityFallback),
+    }
+  })
 
   const rankingTeams = mapSheetObjects(workbook, 'RANKING_TEAM').map((row) => ({
     rank: toNumber(row.rank),

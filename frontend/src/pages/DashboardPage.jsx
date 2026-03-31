@@ -1,7 +1,7 @@
 ﻿import KpiCard from '../components/KpiCard'
 import RankingList from '../components/RankingList'
 import { useDashboard } from '../context/DashboardContext'
-import { getDashboard } from '../data/api'
+import { getDashboard, getTickets } from '../data/api'
 import useApiResource from '../hooks/useApiResource'
 
 function MessageBlock({ title, message, isError = false }) {
@@ -15,19 +15,21 @@ function MessageBlock({ title, message, isError = false }) {
 
 function DashboardPage() {
   const { state } = useDashboard()
+  const filterDeps = [
+    state.filters.dateRange,
+    state.filters.dateFrom,
+    state.filters.dateTo,
+    state.filters.sto,
+    state.filters.team,
+    state.filters.status,
+    state.filters.serviceType,
+    state.filters.teknisi,
+  ]
   const { data, loading, error } = useApiResource(
     () => getDashboard(state.filters),
-    [
-      state.filters.dateRange,
-      state.filters.dateFrom,
-      state.filters.dateTo,
-      state.filters.sto,
-      state.filters.team,
-      state.filters.status,
-      state.filters.serviceType,
-      state.filters.teknisi,
-    ],
+    filterDeps,
   )
+  const { data: ticketPayload } = useApiResource(() => getTickets(state.filters), filterDeps)
 
   if (loading && !data) {
     return <MessageBlock title="Memuat dashboard" message="Mohon tunggu sebentar." />
@@ -52,7 +54,7 @@ function DashboardPage() {
       closeSqm: 0,
     },
   }
-  const breakdown = {
+  const breakdownFromKpi = {
     totalReguler: kpis.breakdown?.totalReguler ?? 0,
     totalSqm: kpis.breakdown?.totalSqm ?? 0,
     openReguler: kpis.breakdown?.openReguler ?? 0,
@@ -60,6 +62,53 @@ function DashboardPage() {
     closeReguler: kpis.breakdown?.closeReguler ?? 0,
     closeSqm: kpis.breakdown?.closeSqm ?? 0,
   }
+  const breakdownFromTickets = (ticketPayload?.items ?? []).reduce(
+    (acc, ticket) => {
+      const jenisTiket = String(ticket?.jenisTiket ?? '')
+        .trim()
+        .toUpperCase()
+      const status = String(ticket?.status ?? '')
+        .trim()
+        .toUpperCase()
+      const isSqm = jenisTiket.includes('SQM')
+      const isClosed = status.startsWith('CLOSE')
+
+      if (isSqm) {
+        acc.totalSqm += 1
+        if (isClosed) {
+          acc.closeSqm += 1
+        } else {
+          acc.openSqm += 1
+        }
+      } else {
+        acc.totalReguler += 1
+        if (isClosed) {
+          acc.closeReguler += 1
+        } else {
+          acc.openReguler += 1
+        }
+      }
+
+      return acc
+    },
+    {
+      totalReguler: 0,
+      totalSqm: 0,
+      openReguler: 0,
+      openSqm: 0,
+      closeReguler: 0,
+      closeSqm: 0,
+    },
+  )
+  const totalBreakdownFromKpi =
+    breakdownFromKpi.totalReguler +
+    breakdownFromKpi.totalSqm +
+    breakdownFromKpi.openReguler +
+    breakdownFromKpi.openSqm +
+    breakdownFromKpi.closeReguler +
+    breakdownFromKpi.closeSqm
+  const shouldUseKpiBreakdown = totalBreakdownFromKpi > 0 || kpis.totalTickets === 0
+  const breakdown = shouldUseKpiBreakdown ? breakdownFromKpi : breakdownFromTickets
   const totalTicketDetail = `Reguler ${breakdown.totalReguler} • SQM ${breakdown.totalSqm}`
   const openTicketDetail = `Reguler ${breakdown.openReguler} • SQM ${breakdown.openSqm}`
   const closeTicketDetail = `Reguler ${breakdown.closeReguler} • SQM ${breakdown.closeSqm}`

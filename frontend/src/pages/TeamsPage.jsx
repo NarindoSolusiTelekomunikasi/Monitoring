@@ -123,8 +123,11 @@ function TeamsPage() {
                   <th>Team</th>
                   <th>Open Reg</th>
                   <th>Open SQM</th>
+                  <th>Open UNSPEC</th>
                   <th>Close Reg</th>
                   <th>Close SQM</th>
+                  <th>Close UNSPEC</th>
+                  <th>Sisa UNSPEC</th>
                   <th>Total Open</th>
                   <th>Total Close</th>
                   <th>Produktivitas</th>
@@ -137,8 +140,11 @@ function TeamsPage() {
                     <td>{row.team}</td>
                     <td>{row.openReg}</td>
                     <td>{row.openSqm}</td>
+                    <td>{row.openUnspec ?? 0}</td>
                     <td>{row.closeReg}</td>
                     <td>{row.closeSqm}</td>
+                    <td>{row.closeUnspec ?? 0}</td>
+                    <td>{row.sisaUnspec ?? 0}</td>
                     <td>{row.totalOpen}</td>
                     <td>{row.totalClose}</td>
                     <td>
