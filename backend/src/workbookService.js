@@ -118,6 +118,20 @@ function readNumberFromRow(row, keys, fallbackValue) {
   return fallbackValue == null ? 0 : fallbackValue
 }
 
+function readNumberFromRowByTokens(row, tokenGroups, fallbackValue) {
+  const keys = Object.keys(row || {})
+  for (const originalKey of keys) {
+    const key = normalizeKey(originalKey)
+    for (const tokens of tokenGroups) {
+      const matched = tokens.every((token) => key.includes(token))
+      if (matched) {
+        return toNumber(row[originalKey])
+      }
+    }
+  }
+  return fallbackValue == null ? 0 : fallbackValue
+}
+
 function toNullableText(value) {
   const normalized = normalizeText(value)
   return normalized || null
@@ -357,11 +371,37 @@ async function loadWorkbookData() {
     const openSqm = readNumberFromRow(row, ['open_sqm', 'opensqm'])
     const closeReg = readNumberFromRow(row, ['close_reg', 'closereg'])
     const closeSqm = readNumberFromRow(row, ['close_sqm', 'closesqm'])
-    const openUnspec = readNumberFromRow(row, ['open_unspec', 'openunspec', 'unspec_open'])
-    const closeUnspec = readNumberFromRow(row, ['close_unspec', 'closeunspec', 'unspec_close'])
-    const sisaUnspec = readNumberFromRow(row, ['sisa_unspec', 'sisaunspec', 'unspec_remaining'])
+    let openUnspec = readNumberFromRow(row, ['open_unspec', 'openunspec', 'unspec_open'])
+    if (openUnspec === 0) {
+      openUnspec = readNumberFromRowByTokens(row, [['open', 'unspec']])
+    }
+
+    let closeUnspec = readNumberFromRow(row, ['close_unspec', 'closeunspec', 'unspec_close'])
+    if (closeUnspec === 0) {
+      closeUnspec = readNumberFromRowByTokens(row, [['close', 'unspec']])
+    }
+
+    let sisaUnspec = readNumberFromRow(row, ['sisa_unspec', 'sisaunspec', 'unspec_remaining'])
+    if (sisaUnspec === 0) {
+      sisaUnspec = readNumberFromRowByTokens(row, [['sisa', 'unspec'], ['remaining', 'unspec']])
+    }
+
     const totalOpen = readNumberFromRow(row, ['total_open', 'opentotal'])
     const totalClose = readNumberFromRow(row, ['total_close', 'closetotal'])
+    let productivity = readNumberFromRow(row, [
+      'productivity',
+      'productivitas',
+      'produktivitas',
+      'produktifitas',
+      'produktivity',
+      'produktvitas',
+    ])
+    if (productivity === 0) {
+      productivity = readNumberFromRowByTokens(row, [['productiv'], ['produktiv']])
+    }
+    if (productivity === 0 && (totalOpen > 0 || totalClose > 0)) {
+      productivity = Math.round((totalClose / (totalOpen + totalClose)) * 10000) / 100
+    }
 
     return {
       sto: normalizeText(row.sto),
@@ -375,7 +415,7 @@ async function loadWorkbookData() {
       sisaUnspec,
       totalOpen,
       totalClose,
-      productivity: readNumberFromRow(row, ['productivity', 'produktifitas', 'produktivity', 'produktvitas']),
+      productivity,
     }
   })
 

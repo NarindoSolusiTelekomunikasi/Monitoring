@@ -4,7 +4,7 @@ const CONFIG = {
     '1xKFr7vfaEltmSJu6UAodKBqk-fdST8I9vEU-fyC1xLM',
   cacheTtlSeconds: 60,
   filtersCacheTtlSeconds: 300,
-  cacheVersion: '2026-03-19-2',
+  cacheVersion: '2026-03-31-2',
 }
 
 const SHEET_CONFIG = {
@@ -234,6 +234,23 @@ function readNumberFromRow(row, keys, fallbackValue) {
     var key = keys[index]
     if (Object.prototype.hasOwnProperty.call(row, key) && row[key] !== '' && row[key] != null) {
       return toNumber(row[key])
+    }
+  }
+  return fallbackValue == null ? 0 : fallbackValue
+}
+
+function readNumberFromRowByTokens(row, tokenGroups, fallbackValue) {
+  var keys = Object.keys(row || {})
+  for (var index = 0; index < keys.length; index += 1) {
+    var key = normalizeKey(keys[index])
+    for (var groupIndex = 0; groupIndex < tokenGroups.length; groupIndex += 1) {
+      var tokens = tokenGroups[groupIndex]
+      var allMatched = tokens.every(function (token) {
+        return key.indexOf(token) >= 0
+      })
+      if (allMatched) {
+        return toNumber(row[keys[index]])
+      }
     }
   }
   return fallbackValue == null ? 0 : fallbackValue
@@ -528,10 +545,36 @@ function loadSpreadsheetData() {
     var closeReg = readNumberFromRow(row, ['close_reg', 'closereg'])
     var closeSqm = readNumberFromRow(row, ['close_sqm', 'closesqm'])
     var openUnspec = readNumberFromRow(row, ['open_unspec', 'openunspec', 'unspec_open'])
+    if (openUnspec === 0) {
+      openUnspec = readNumberFromRowByTokens(row, [['open', 'unspec']])
+    }
+
     var closeUnspec = readNumberFromRow(row, ['close_unspec', 'closeunspec', 'unspec_close'])
+    if (closeUnspec === 0) {
+      closeUnspec = readNumberFromRowByTokens(row, [['close', 'unspec']])
+    }
+
     var sisaUnspec = readNumberFromRow(row, ['sisa_unspec', 'sisaunspec', 'unspec_remaining'])
+    if (sisaUnspec === 0) {
+      sisaUnspec = readNumberFromRowByTokens(row, [['sisa', 'unspec'], ['remaining', 'unspec']])
+    }
+
     var totalOpen = readNumberFromRow(row, ['total_open', 'opentotal'])
     var totalClose = readNumberFromRow(row, ['total_close', 'closetotal'])
+    var productivity = readNumberFromRow(row, [
+      'productivity',
+      'productivitas',
+      'produktivitas',
+      'produktifitas',
+      'produktivity',
+      'produktvitas',
+    ])
+    if (productivity === 0) {
+      productivity = readNumberFromRowByTokens(row, [['productiv'], ['produktiv']])
+    }
+    if (productivity === 0 && (totalOpen > 0 || totalClose > 0)) {
+      productivity = Math.round((totalClose / (totalOpen + totalClose)) * 10000) / 100
+    }
 
     return {
       sto: normalizeText(row.sto),
@@ -545,7 +588,7 @@ function loadSpreadsheetData() {
       sisaUnspec: sisaUnspec,
       totalOpen: totalOpen,
       totalClose: totalClose,
-      productivity: readNumberFromRow(row, ['productivity', 'produktifitas', 'produktivity', 'produktvitas']),
+      productivity: productivity,
     }
   })
 
