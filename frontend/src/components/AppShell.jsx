@@ -21,11 +21,11 @@ const pageMeta = {
     description: 'Performansi team berdasarkan tiket yang telah diselesaikan.',
   },
   '/imjas': {
-    title: 'IMJAS',
+    title: 'Imjas',
     description: 'Monitoring IMJAS per STO dan team..',
   },
   '/unspec': {
-    title: 'UNSPEC',
+    title: 'Unspec',
     description: 'Monitoring UNSPEC per STO dan team',
   },
 }
