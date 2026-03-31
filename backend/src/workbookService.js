@@ -366,7 +366,7 @@ async function loadWorkbookData() {
     }
   })
 
-  const stoCommandCenter = mapSheetObjects(workbook, 'STO_COMMAND_CENTER').map((row) => {
+  let stoCommandCenter = mapSheetObjects(workbook, 'STO_COMMAND_CENTER').map((row) => {
     const openReg = readNumberFromRow(row, ['open_reg', 'openreg'])
     const openSqm = readNumberFromRow(row, ['open_sqm', 'opensqm'])
     const closeReg = readNumberFromRow(row, ['close_reg', 'closereg'])
@@ -451,6 +451,31 @@ async function loadWorkbookData() {
     sisaUnspec: toNumber(row.sisa_unspec),
     kendala: toNullableText(row.kendala),
   }))
+
+  const unspecByTeam = new Map()
+  unspec.forEach((item) => {
+    const key = `${item.sto}::${item.team}`
+    const current = unspecByTeam.get(key) ?? { openUnspec: 0, closeUnspec: 0, sisaUnspec: 0 }
+    current.openUnspec += item.openUnspec
+    current.closeUnspec += item.closeUnspec
+    current.sisaUnspec += item.sisaUnspec
+    unspecByTeam.set(key, current)
+  })
+
+  stoCommandCenter = stoCommandCenter.map((row) => {
+    const key = `${row.sto}::${row.team}`
+    const unspecSummary = unspecByTeam.get(key)
+    if (!unspecSummary) {
+      return row
+    }
+
+    return {
+      ...row,
+      openUnspec: row.openUnspec || unspecSummary.openUnspec,
+      closeUnspec: row.closeUnspec || unspecSummary.closeUnspec,
+      sisaUnspec: row.sisaUnspec || unspecSummary.sisaUnspec,
+    }
+  })
 
   return {
     workbook,

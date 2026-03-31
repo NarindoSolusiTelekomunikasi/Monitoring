@@ -4,7 +4,7 @@ const CONFIG = {
     '1xKFr7vfaEltmSJu6UAodKBqk-fdST8I9vEU-fyC1xLM',
   cacheTtlSeconds: 60,
   filtersCacheTtlSeconds: 300,
-  cacheVersion: '2026-03-31-3',
+  cacheVersion: '2026-03-31-4',
 }
 
 const SHEET_CONFIG = {
@@ -540,7 +540,7 @@ function loadSpreadsheetData() {
     }
   })
 
-  const stoCommandCenter = mapSheetObjects(spreadsheet, 'STO_COMMAND_CENTER').map(function (row) {
+  let stoCommandCenter = mapSheetObjects(spreadsheet, 'STO_COMMAND_CENTER').map(function (row) {
     var openReg = readNumberFromRow(row, ['open_reg', 'openreg'])
     var openSqm = readNumberFromRow(row, ['open_sqm', 'opensqm'])
     var closeReg = readNumberFromRow(row, ['close_reg', 'closereg'])
@@ -641,6 +641,30 @@ function loadSpreadsheetData() {
         kendala: toNullableText(row.kendala),
       }
     })
+
+  const unspecByTeam = new Map()
+  unspec.forEach(function (item) {
+    const key = `${item.sto}::${item.team}`
+    const current = unspecByTeam.get(key) || { openUnspec: 0, closeUnspec: 0, sisaUnspec: 0 }
+    current.openUnspec += item.openUnspec
+    current.closeUnspec += item.closeUnspec
+    current.sisaUnspec += item.sisaUnspec
+    unspecByTeam.set(key, current)
+  })
+
+  stoCommandCenter = stoCommandCenter.map(function (row) {
+    const key = `${row.sto}::${row.team}`
+    const unspecSummary = unspecByTeam.get(key)
+    if (!unspecSummary) {
+      return row
+    }
+
+    return Object.assign({}, row, {
+      openUnspec: row.openUnspec || unspecSummary.openUnspec,
+      closeUnspec: row.closeUnspec || unspecSummary.closeUnspec,
+      sisaUnspec: row.sisaUnspec || unspecSummary.sisaUnspec,
+    })
+  })
 
   RUNTIME_SPREADSHEET_DATA = {
     ticketSourceSheet: TICKET_SOURCE_SHEET,
