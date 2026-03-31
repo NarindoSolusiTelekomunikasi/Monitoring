@@ -5,7 +5,7 @@ export default defineConfig(({ mode }) => {
   const env = loadEnv(mode, process.cwd(), '')
   const apiStyle = String(env.VITE_API_STYLE ?? 'rest').trim().toLowerCase()
   const apiBaseUrl = String(env.VITE_API_BASE_URL ?? '').trim()
-  const base = env.VITE_BASE_PATH || (mode === 'production' ? '/Monitoring/' : '/')
+  const base = String(env.VITE_BASE_PATH ?? '').trim() || (mode === 'production' ? './' : '/')
 
   return {
     base,

@@ -22,17 +22,43 @@ const initialState = {
   theme: 'dark',
 }
 
+function safelyReadStoredTheme() {
+  if (typeof window === 'undefined') {
+    return null
+  }
+
+  try {
+    const value = window.localStorage.getItem(THEME_STORAGE_KEY)
+    return VALID_THEMES.has(value) ? value : null
+  } catch {
+    return null
+  }
+}
+
+function safelyPersistTheme(theme) {
+  if (typeof window === 'undefined') {
+    return
+  }
+
+  try {
+    window.localStorage.setItem(THEME_STORAGE_KEY, theme)
+  } catch {
+    // localStorage can be blocked in embedded or sandboxed environments.
+  }
+}
+
 function getInitialTheme() {
   if (typeof window === 'undefined') {
     return 'dark'
   }
 
-  const storedTheme = window.localStorage.getItem(THEME_STORAGE_KEY)
-  if (VALID_THEMES.has(storedTheme)) {
+  const storedTheme = safelyReadStoredTheme()
+  if (storedTheme) {
     return storedTheme
   }
 
-  return window.matchMedia('(prefers-color-scheme: light)').matches ? 'light' : 'dark'
+  const hasMatchMedia = typeof window.matchMedia === 'function'
+  return hasMatchMedia && window.matchMedia('(prefers-color-scheme: light)').matches ? 'light' : 'dark'
 }
 
 function createInitialState() {
@@ -103,7 +129,7 @@ export function DashboardProvider({ children }) {
     if (typeof window === 'undefined') {
       return
     }
-    window.localStorage.setItem(THEME_STORAGE_KEY, state.theme)
+    safelyPersistTheme(state.theme)
     document.body.setAttribute('data-theme', state.theme)
     document.documentElement.style.colorScheme = state.theme
   }, [state.theme])
