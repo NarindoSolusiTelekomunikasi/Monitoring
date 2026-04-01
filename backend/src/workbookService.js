@@ -24,6 +24,7 @@ const FILTER_DATE_RANGES = {
 
 const STATUS_OPTIONS = ['OPEN', 'CLOSE SYSTEM', 'CLOSE HD', 'CLOSE MYI']
 const TICKET_SOURCE_SHEET = 'ManualDATABASE'
+const JADWAL_SHEET_CANDIDATES = ['JADWAL_KTU_SGB', 'JADWAL KTU SGB']
 const JAKARTA_OFFSET_MS = 7 * 60 * 60 * 1000
 
 function getGoogleSheetsExportUrl() {
@@ -74,6 +75,15 @@ function getSheetRows(workbook, sheetName) {
     raw: false,
     blankrows: false,
   })
+}
+
+function resolveExistingSheetName(workbook, candidates) {
+  for (const candidate of candidates) {
+    if (workbook.Sheets[candidate]) {
+      return candidate
+    }
+  }
+  throw new Error(`Sheet tidak ditemukan. Cek salah satu: ${candidates.join(', ')}`)
 }
 
 function normalizeText(value) {
@@ -329,6 +339,171 @@ function buildTeamLookup(teamMasterRows) {
   return lookup
 }
 
+function buildTechnicianAliasLookup(teamLookup) {
+  const aliasMap = new Map()
+  const collisions = new Set()
+
+  teamLookup.forEach((info, technicianKey) => {
+    const alias = normalizeText(technicianKey).split(' ')[0]
+    if (!alias) {
+      return
+    }
+    if (aliasMap.has(alias) && aliasMap.get(alias).team !== info.team) {
+      collisions.add(alias)
+      return
+    }
+    aliasMap.set(alias, info)
+  })
+
+  collisions.forEach((alias) => aliasMap.delete(alias))
+  return aliasMap
+}
+
+function resolveTechnicianTeamInfo(name, teamLookup, aliasLookup) {
+  const normalizedName = normalizeText(name).toUpperCase()
+  if (!normalizedName) {
+    return null
+  }
+
+  if (teamLookup.has(normalizedName)) {
+    return teamLookup.get(normalizedName)
+  }
+
+  if (aliasLookup.has(normalizedName)) {
+    return aliasLookup.get(normalizedName)
+  }
+
+  let fuzzyMatch = null
+  aliasLookup.forEach((info, alias) => {
+    if (fuzzyMatch) {
+      return
+    }
+    if (alias.length >= 3 && (alias.startsWith(normalizedName) || normalizedName.startsWith(alias))) {
+      fuzzyMatch = info
+    }
+  })
+  return fuzzyMatch
+}
+
+function parseJadwalSectionMeta(text) {
+  const upper = normalizeText(text).toUpperCase()
+  const stoMatch = upper.match(/\b(KTU|SGB)\b/)
+  const monthYearMatch = upper.match(/\b(JANUARI|FEBRUARI|MARET|APRIL|MEI|JUNI|JULI|AGUSTUS|SEPTEMBER|OKTOBER|NOVEMBER|DESEMBER)\b\s+(\d{4})/)
+  return {
+    sto: stoMatch ? stoMatch[1] : '',
+    month: monthYearMatch ? monthYearMatch[1] : '',
+    year: monthYearMatch ? monthYearMatch[2] : '',
+    label: monthYearMatch ? `${monthYearMatch[1]} ${monthYearMatch[2]}` : upper,
+  }
+}
+
+function parseJadwalHeaderInfo(row) {
+  let hadirIndex = -1
+  let izinIndex = -1
+  let sakitIndex = -1
+  const dayColumns = []
+
+  for (let index = 0; index < row.length; index += 1) {
+    const normalized = normalizeKey(row[index])
+    if (normalized === 'hadir') hadirIndex = index
+    if (normalized === 'izin') izinIndex = index
+    if (normalized === 'sakit') sakitIndex = index
+  }
+
+  const summaryStart = [hadirIndex, izinIndex, sakitIndex]
+    .filter((value) => value >= 0)
+    .sort((left, right) => left - right)[0]
+
+  const dayEnd = summaryStart >= 0 ? summaryStart - 1 : row.length - 1
+  for (let col = 3; col <= dayEnd; col += 1) {
+    const dayText = normalizeText(row[col])
+    if (/^\d{1,2}$/.test(dayText)) {
+      dayColumns.push({ index: col, day: dayText })
+    }
+  }
+
+  return {
+    nameIndex: 0,
+    nikIndex: 1,
+    phoneIndex: 2,
+    hadirIndex,
+    izinIndex,
+    sakitIndex,
+    dayColumns,
+  }
+}
+
+function parseJadwalRows(workbook, teamLookup) {
+  const jadwalSheetName = resolveExistingSheetName(workbook, JADWAL_SHEET_CANDIDATES)
+  const rows = getSheetRows(workbook, jadwalSheetName)
+  const aliasLookup = buildTechnicianAliasLookup(teamLookup)
+  const items = []
+  let currentSection = { sto: '', month: '', year: '', label: '' }
+  let headerInfo = null
+
+  for (let rowIndex = 0; rowIndex < rows.length; rowIndex += 1) {
+    const row = rows[rowIndex]
+    const hasAnyValue = row.some((cell) => normalizeText(cell))
+    if (!hasAnyValue) {
+      continue
+    }
+
+    const firstCell = normalizeText(row[0])
+    const firstUpper = firstCell.toUpperCase()
+    if (firstUpper.includes('JADWAL ABSENSI TEKNISI')) {
+      currentSection = parseJadwalSectionMeta(firstCell)
+      headerInfo = null
+      continue
+    }
+
+    if (normalizeKey(firstCell) === 'nama_karyawan') {
+      headerInfo = parseJadwalHeaderInfo(row)
+      continue
+    }
+
+    if (!headerInfo) {
+      continue
+    }
+
+    const teknisi = normalizeText(row[headerInfo.nameIndex])
+    if (!teknisi) {
+      continue
+    }
+
+    const teamInfo = resolveTechnicianTeamInfo(teknisi, teamLookup, aliasLookup)
+    const hadir = headerInfo.hadirIndex >= 0 ? toNumber(row[headerInfo.hadirIndex]) : 0
+    const izin = headerInfo.izinIndex >= 0 ? toNumber(row[headerInfo.izinIndex]) : 0
+    const sakit = headerInfo.sakitIndex >= 0 ? toNumber(row[headerInfo.sakitIndex]) : 0
+
+    const jadwalEntries = []
+    headerInfo.dayColumns.forEach((column) => {
+      const value = normalizeText(row[column.index])
+      if (value) {
+        jadwalEntries.push(`${column.day}:${value}`)
+      }
+    })
+
+    items.push({
+      sto: teamInfo ? teamInfo.sto : currentSection.sto,
+      team: teamInfo ? teamInfo.team : '',
+      teknisi,
+      nik: normalizeText(row[headerInfo.nikIndex]) || null,
+      noHp: normalizeText(row[headerInfo.phoneIndex]) || null,
+      periode: currentSection.label,
+      bulan: currentSection.month,
+      tahun: currentSection.year,
+      hadir,
+      izin,
+      sakit,
+      jadwal: jadwalEntries.join(', '),
+      statusKehadiran: '',
+      keterangan: null,
+    })
+  }
+
+  return items
+}
+
 function countTechniciansNarindo(teknisiNarindoRows, filters = {}) {
   const selectedStos = parseFilterValues(filters.sto)
   const selectedTeams = parseFilterValues(filters.team)
@@ -460,31 +635,7 @@ async function loadWorkbookData() {
     totalClose: toNumber(row.total_close),
   }))
 
-  const jadwal = mapSheetObjects(workbook, 'JADWAL_KTU_SGB')
-    .filter((row) => row && Object.keys(row).some((key) => normalizeText(row[key])))
-    .map((row) => {
-      const sto = pickFirstText(row, ['sto', 'witel', 'witel_sto', 'area'])
-      const team = pickFirstText(row, ['team', 'nama_team', 'tim'])
-      const teknisi = pickFirstText(row, ['teknisi', 'nama_teknisi', 'nama', 'personil', 'karyawan'])
-      const tanggal = pickFirstText(row, ['tanggal', 'date', 'tgl', 'hari_tanggal'])
-      const hari = pickFirstText(row, ['hari'])
-      const shift = pickFirstText(row, ['shift', 'jadwal', 'jam_kerja'])
-      const statusKehadiran = normalizeAttendanceStatus(
-        pickFirstText(row, ['status', 'status_kehadiran', 'kehadiran', 'absen']),
-      )
-      const keterangan = pickFirstText(row, ['keterangan', 'ket', 'catatan', 'note'])
-
-      return {
-        sto,
-        team,
-        teknisi,
-        tanggal,
-        hari,
-        shift,
-        statusKehadiran,
-        keterangan: keterangan || null,
-      }
-    })
+  const jadwal = parseJadwalRows(workbook, teamLookup)
 
   const imjas = mapSheetObjects(workbook, 'IMJAS').map((row) => ({
     sto: normalizeText(row.sto),
@@ -1007,29 +1158,14 @@ function summarizeUnspec(items) {
 }
 
 function summarizeJadwal(items) {
-  const summary = {
+  return {
     totalRows: items.length,
-    totalHadir: 0,
-    totalIzin: 0,
-    totalSakit: 0,
+    totalTechnicians: items.length,
+    totalHadir: items.reduce((sum, item) => sum + toNumber(item.hadir), 0),
+    totalIzin: items.reduce((sum, item) => sum + toNumber(item.izin), 0),
+    totalSakit: items.reduce((sum, item) => sum + toNumber(item.sakit), 0),
     totalAlpha: 0,
-    totalCuti: 0,
-    totalLibur: 0,
-    totalOther: 0,
   }
-
-  items.forEach((item) => {
-    const status = normalizeAttendanceStatus(item.statusKehadiran)
-    if (status === 'HADIR') summary.totalHadir += 1
-    else if (status === 'IZIN') summary.totalIzin += 1
-    else if (status === 'SAKIT') summary.totalSakit += 1
-    else if (status === 'ALPHA') summary.totalAlpha += 1
-    else if (status === 'CUTI') summary.totalCuti += 1
-    else if (status === 'LIBUR') summary.totalLibur += 1
-    else if (status) summary.totalOther += 1
-  })
-
-  return summary
 }
 
 export async function getImjasData(filters = {}) {

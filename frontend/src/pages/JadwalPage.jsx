@@ -38,6 +38,7 @@ function JadwalPage() {
 
   const summary = data?.summary ?? {
     totalRows: 0,
+    totalTechnicians: 0,
     totalHadir: 0,
     totalIzin: 0,
     totalSakit: 0,
@@ -48,10 +49,10 @@ function JadwalPage() {
   return (
     <div className="page-stack">
       <section className="kpi-grid">
-        <KpiCard label="Total Jadwal" value={summary.totalRows} trend="Jumlah baris jadwal yang tampil sesuai filter." badge="Kehadiran" tone="total" />
-        <KpiCard label="Hadir" value={summary.totalHadir} trend="Status hadir." badge="On duty" tone="close" />
+        <KpiCard label="Total Personil" value={summary.totalTechnicians ?? summary.totalRows} trend="Jumlah teknisi yang tampil pada jadwal." badge="Kehadiran" tone="total" />
+        <KpiCard label="Total Hadir" value={summary.totalHadir} trend="Akumulasi hadir dari rekap sheet." badge="On duty" tone="close" />
         <KpiCard label="Izin + Sakit" value={(summary.totalIzin ?? 0) + (summary.totalSakit ?? 0)} trend="Akumulasi izin dan sakit." badge="Perlu monitor" tone="open" />
-        <KpiCard label="Alpha" value={summary.totalAlpha} trend="Status alpha pada jadwal kehadiran." badge="Follow up" tone="warning" />
+        <KpiCard label="Total Alpha" value={summary.totalAlpha} trend="Alpha terdeteksi dari rekap jadwal." badge="Follow up" tone="warning" />
       </section>
 
       <section className="panel table-panel">
@@ -70,24 +71,28 @@ function JadwalPage() {
                   <th>STO</th>
                   <th>Team</th>
                   <th>Teknisi</th>
-                  <th>Hari</th>
-                  <th>Tanggal</th>
-                  <th>Shift</th>
-                  <th>Status</th>
-                  <th>Keterangan</th>
+                  <th>NIK</th>
+                  <th>No HP</th>
+                  <th>Periode</th>
+                  <th>Hadir</th>
+                  <th>Izin</th>
+                  <th>Sakit</th>
+                  <th>Jadwal</th>
                 </tr>
               </thead>
               <tbody>
                 {items.map((row, index) => (
-                  <tr key={`${row.sto}-${row.team}-${row.teknisi}-${row.tanggal}-${index}`}>
+                  <tr key={`${row.sto}-${row.team}-${row.teknisi}-${row.periode}-${index}`}>
                     <td>{row.sto || '-'}</td>
                     <td>{row.team || '-'}</td>
                     <td>{row.teknisi || '-'}</td>
-                    <td>{row.hari || '-'}</td>
-                    <td>{row.tanggal || '-'}</td>
-                    <td>{row.shift || '-'}</td>
-                    <td>{row.statusKehadiran || '-'}</td>
-                    <td>{row.keterangan || '-'}</td>
+                    <td>{row.nik || '-'}</td>
+                    <td>{row.noHp || '-'}</td>
+                    <td>{row.periode || '-'}</td>
+                    <td>{row.hadir ?? 0}</td>
+                    <td>{row.izin ?? 0}</td>
+                    <td>{row.sakit ?? 0}</td>
+                    <td>{row.jadwal || '-'}</td>
                   </tr>
                 ))}
               </tbody>
