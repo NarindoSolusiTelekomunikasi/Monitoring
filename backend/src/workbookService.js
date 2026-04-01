@@ -8,7 +8,6 @@ const SHEET_CONFIG = {
   TEKNISI_NARINDO: { headerRow: 0 },
   TEAM_PERFORMANCE: { headerRow: 0 },
   STO_COMMAND_CENTER: { headerRow: 0 },
-  JADWAL_KTU_SGB: { headerRow: 0 },
   RANKING_TEAM: { headerRow: 0 },
   RANKING_TEKNISI: { headerRow: 0 },
   IMJAS: { headerRow: 1 },
@@ -24,7 +23,6 @@ const FILTER_DATE_RANGES = {
 
 const STATUS_OPTIONS = ['OPEN', 'CLOSE SYSTEM', 'CLOSE HD', 'CLOSE MYI']
 const TICKET_SOURCE_SHEET = 'ManualDATABASE'
-const JADWAL_SHEET_CANDIDATES = ['JADWAL_KTU_SGB', 'JADWAL KTU SGB']
 const JAKARTA_OFFSET_MS = 7 * 60 * 60 * 1000
 
 function getGoogleSheetsExportUrl() {
@@ -75,15 +73,6 @@ function getSheetRows(workbook, sheetName) {
     raw: false,
     blankrows: false,
   })
-}
-
-function resolveExistingSheetName(workbook, candidates) {
-  for (const candidate of candidates) {
-    if (workbook.Sheets[candidate]) {
-      return candidate
-    }
-  }
-  throw new Error(`Sheet tidak ditemukan. Cek salah satu: ${candidates.join(', ')}`)
 }
 
 function normalizeText(value) {
@@ -385,125 +374,6 @@ function resolveTechnicianTeamInfo(name, teamLookup, aliasLookup) {
   return fuzzyMatch
 }
 
-function parseJadwalSectionMeta(text) {
-  const upper = normalizeText(text).toUpperCase()
-  const stoMatch = upper.match(/\b(KTU|SGB)\b/)
-  const monthYearMatch = upper.match(/\b(JANUARI|FEBRUARI|MARET|APRIL|MEI|JUNI|JULI|AGUSTUS|SEPTEMBER|OKTOBER|NOVEMBER|DESEMBER)\b\s+(\d{4})/)
-  return {
-    sto: stoMatch ? stoMatch[1] : '',
-    month: monthYearMatch ? monthYearMatch[1] : '',
-    year: monthYearMatch ? monthYearMatch[2] : '',
-    label: monthYearMatch ? `${monthYearMatch[1]} ${monthYearMatch[2]}` : upper,
-  }
-}
-
-function parseJadwalHeaderInfo(row) {
-  let hadirIndex = -1
-  let izinIndex = -1
-  let sakitIndex = -1
-  const dayColumns = []
-
-  for (let index = 0; index < row.length; index += 1) {
-    const normalized = normalizeKey(row[index])
-    if (normalized === 'hadir') hadirIndex = index
-    if (normalized === 'izin') izinIndex = index
-    if (normalized === 'sakit') sakitIndex = index
-  }
-
-  const summaryStart = [hadirIndex, izinIndex, sakitIndex]
-    .filter((value) => value >= 0)
-    .sort((left, right) => left - right)[0]
-
-  const dayEnd = summaryStart >= 0 ? summaryStart - 1 : row.length - 1
-  for (let col = 3; col <= dayEnd; col += 1) {
-    const dayText = normalizeText(row[col])
-    if (/^\d{1,2}$/.test(dayText)) {
-      dayColumns.push({ index: col, day: dayText })
-    }
-  }
-
-  return {
-    nameIndex: 0,
-    nikIndex: 1,
-    phoneIndex: 2,
-    hadirIndex,
-    izinIndex,
-    sakitIndex,
-    dayColumns,
-  }
-}
-
-function parseJadwalRows(workbook, teamLookup) {
-  const jadwalSheetName = resolveExistingSheetName(workbook, JADWAL_SHEET_CANDIDATES)
-  const rows = getSheetRows(workbook, jadwalSheetName)
-  const aliasLookup = buildTechnicianAliasLookup(teamLookup)
-  const items = []
-  let currentSection = { sto: '', month: '', year: '', label: '' }
-  let headerInfo = null
-
-  for (let rowIndex = 0; rowIndex < rows.length; rowIndex += 1) {
-    const row = rows[rowIndex]
-    const hasAnyValue = row.some((cell) => normalizeText(cell))
-    if (!hasAnyValue) {
-      continue
-    }
-
-    const firstCell = normalizeText(row[0])
-    const firstUpper = firstCell.toUpperCase()
-    if (firstUpper.includes('JADWAL ABSENSI TEKNISI')) {
-      currentSection = parseJadwalSectionMeta(firstCell)
-      headerInfo = null
-      continue
-    }
-
-    if (normalizeKey(firstCell) === 'nama_karyawan') {
-      headerInfo = parseJadwalHeaderInfo(row)
-      continue
-    }
-
-    if (!headerInfo) {
-      continue
-    }
-
-    const teknisi = normalizeText(row[headerInfo.nameIndex])
-    if (!teknisi) {
-      continue
-    }
-
-    const teamInfo = resolveTechnicianTeamInfo(teknisi, teamLookup, aliasLookup)
-    const hadir = headerInfo.hadirIndex >= 0 ? toNumber(row[headerInfo.hadirIndex]) : 0
-    const izin = headerInfo.izinIndex >= 0 ? toNumber(row[headerInfo.izinIndex]) : 0
-    const sakit = headerInfo.sakitIndex >= 0 ? toNumber(row[headerInfo.sakitIndex]) : 0
-
-    const jadwalEntries = []
-    headerInfo.dayColumns.forEach((column) => {
-      const value = normalizeText(row[column.index])
-      if (value) {
-        jadwalEntries.push(`${column.day}:${value}`)
-      }
-    })
-
-    items.push({
-      sto: teamInfo ? teamInfo.sto : currentSection.sto,
-      team: teamInfo ? teamInfo.team : '',
-      teknisi,
-      nik: normalizeText(row[headerInfo.nikIndex]) || null,
-      noHp: normalizeText(row[headerInfo.phoneIndex]) || null,
-      periode: currentSection.label,
-      bulan: currentSection.month,
-      tahun: currentSection.year,
-      hadir,
-      izin,
-      sakit,
-      jadwal: jadwalEntries.join(', '),
-      statusKehadiran: '',
-      keterangan: null,
-    })
-  }
-
-  return items
-}
-
 function countTechniciansNarindo(teknisiNarindoRows, filters = {}) {
   const selectedStos = parseFilterValues(filters.sto)
   const selectedTeams = parseFilterValues(filters.team)
@@ -635,7 +505,6 @@ async function loadWorkbookData() {
     totalClose: toNumber(row.total_close),
   }))
 
-  const jadwal = parseJadwalRows(workbook, teamLookup)
 
   const imjas = mapSheetObjects(workbook, 'IMJAS').map((row) => ({
     sto: normalizeText(row.sto),
@@ -687,7 +556,6 @@ async function loadWorkbookData() {
     stoCommandCenter,
     rankingTeams,
     rankingTechnicians,
-    jadwal,
     imjas,
     unspec,
   }
@@ -1036,7 +904,6 @@ export async function getHealthData() {
       rawTickets: data.rawTickets.length,
       teamMaster: data.teamMaster.length,
       teknisiNarindo: data.teknisiNarindo.length,
-      jadwal: data.jadwal.length,
       imjas: data.imjas.length,
       unspec: data.unspec.length,
     },
@@ -1057,7 +924,6 @@ export async function getFilterOptions() {
       ...data.rawTickets.map((ticket) => ticket.sto),
       ...data.teamMaster.map((item) => item.sto),
       ...data.teknisiNarindo.map((item) => item.sto),
-      ...data.jadwal.map((item) => item.sto),
       ...data.stoCommandCenter.map((item) => item.sto),
       ...data.imjas.map((item) => item.sto),
       ...data.unspec.map((item) => item.sto),
@@ -1066,7 +932,6 @@ export async function getFilterOptions() {
       ...data.teamMaster.map((item) => item.nama_team),
       ...data.rawTickets.map((ticket) => ticket.team),
       ...data.teknisiNarindo.map((item) => item.team),
-      ...data.jadwal.map((item) => item.team),
       ...data.stoCommandCenter.map((item) => item.team),
       ...data.rankingTeams.map((item) => item.team),
       ...data.imjas.map((item) => item.team),
@@ -1075,7 +940,6 @@ export async function getFilterOptions() {
     teknisis: collectUniqueValues([
       ...data.rawTickets.map((ticket) => ticket.teknisi),
       ...data.teknisiNarindo.map((item) => item.teknisi),
-      ...data.jadwal.map((item) => item.teknisi),
       ...data.rankingTechnicians.map((item) => item.teknisi),
     ]),
     statuses: STATUS_OPTIONS,
@@ -1157,17 +1021,6 @@ function summarizeUnspec(items) {
   }
 }
 
-function summarizeJadwal(items) {
-  return {
-    totalRows: items.length,
-    totalTechnicians: items.length,
-    totalHadir: items.reduce((sum, item) => sum + toNumber(item.hadir), 0),
-    totalIzin: items.reduce((sum, item) => sum + toNumber(item.izin), 0),
-    totalSakit: items.reduce((sum, item) => sum + toNumber(item.sakit), 0),
-    totalAlpha: 0,
-  }
-}
-
 export async function getImjasData(filters = {}) {
   const data = await loadWorkbookData()
   const items = filterByCommonFields(data.imjas, filters, ['sto', 'team'])
@@ -1182,24 +1035,6 @@ export async function getUnspecData(filters = {}) {
   const items = filterByCommonFields(data.unspec, filters, ['sto', 'team', 'kendala'])
   return {
     summary: summarizeUnspec(items),
-    items,
-  }
-}
-
-export async function getJadwalData(filters = {}) {
-  const data = await loadWorkbookData()
-  const items = filterByCommonFields(data.jadwal, filters, [
-    'sto',
-    'team',
-    'teknisi',
-    'tanggal',
-    'hari',
-    'shift',
-    'statusKehadiran',
-    'keterangan',
-  ])
-  return {
-    summary: summarizeJadwal(items),
     items,
   }
 }

@@ -106,8 +106,8 @@ function TeamsPage() {
       <section className="panel table-panel">
         <div className="section-heading section-heading--toolbar">
           <div>
-            <h2>STO Command Center</h2>
-            <p>Ringkasan produktivitas STO dan team dari sheet command center.</p>
+            <h2>Produktivitas Team per STO</h2>
+            <p>Ringkasan produktivitas STO dan team.</p>
           </div>
           <div className="toolbar">
             <span className="summary-pill">{commandCenter.length} rows</span>

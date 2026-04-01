@@ -15,7 +15,6 @@ const SHEET_CONFIG = {
   TEKNISI_NARINDO: { headerRow: 0 },
   TEAM_PERFORMANCE: { headerRow: 0 },
   STO_COMMAND_CENTER: { headerRow: 0 },
-  JADWAL_KTU_SGB: { headerRow: 0 },
   RANKING_TEAM: { headerRow: 0 },
   RANKING_TEKNISI: { headerRow: 0 },
   IMJAS: { headerRow: 1, detectHeader: true },
@@ -31,7 +30,6 @@ const FILTER_DATE_RANGES = {
 
 const STATUS_OPTIONS = ['OPEN', 'CLOSE SYSTEM', 'CLOSE HD', 'CLOSE MYI']
 const TICKET_SOURCE_SHEET = 'ManualDATABASE'
-const JADWAL_SHEET_CANDIDATES = ['JADWAL_KTU_SGB', 'JADWAL KTU SGB']
 const JAKARTA_OFFSET_MS = 7 * 60 * 60 * 1000
 let RUNTIME_SPREADSHEET_DATA = null
 let RUNTIME_FILTER_OPTIONS = null
@@ -94,9 +92,6 @@ function doGet(e) {
       case 'unspec':
         payload = Object.assign({ filters: getFilterOptions() }, getUnspecData(filters))
         break
-      case 'jadwal':
-        payload = Object.assign({ filters: getFilterOptions() }, getJadwalData(filters))
-        break
       default:
         if (normalizedRoute.indexOf('tickets/') === 0) {
           const incidentId = route.split('/').slice(1).join('/')
@@ -139,7 +134,7 @@ function getFilters(e) {
 }
 
 function shouldUseRouteCache(route) {
-  return ['filters', 'dashboard', 'teams', 'rankings/teams', 'rankings/technicians', 'imjas', 'unspec', 'jadwal'].indexOf(route) >= 0
+  return ['filters', 'dashboard', 'teams', 'rankings/teams', 'rankings/technicians', 'imjas', 'unspec'].indexOf(route) >= 0
 }
 
 function getRouteCacheTtl(route) {
@@ -199,16 +194,6 @@ function getSheetBundle(spreadsheet, sheetName) {
     displayRows: range.getDisplayValues(),
     rawRows: range.getValues(),
   }
-}
-
-function resolveExistingSheetName(spreadsheet, candidates) {
-  for (var index = 0; index < candidates.length; index += 1) {
-    var candidate = candidates[index]
-    if (spreadsheet.getSheetByName(candidate)) {
-      return candidate
-    }
-  }
-  throw new Error('Sheet tidak ditemukan. Cek salah satu: ' + candidates.join(', '))
 }
 
 function normalizeText(value) {
@@ -542,132 +527,6 @@ function resolveTechnicianTeamInfo(name, teamLookup, aliasLookup) {
   return fuzzyMatch
 }
 
-function parseJadwalSectionMeta(text) {
-  var upper = normalizeText(text).toUpperCase()
-  var stoMatch = upper.match(/\b(KTU|SGB)\b/)
-  var monthYearMatch = upper.match(/\b(JANUARI|FEBRUARI|MARET|APRIL|MEI|JUNI|JULI|AGUSTUS|SEPTEMBER|OKTOBER|NOVEMBER|DESEMBER)\b\s+(\d{4})/)
-  return {
-    sto: stoMatch ? stoMatch[1] : '',
-    month: monthYearMatch ? monthYearMatch[1] : '',
-    year: monthYearMatch ? monthYearMatch[2] : '',
-    label: monthYearMatch ? `${monthYearMatch[1]} ${monthYearMatch[2]}` : upper,
-  }
-}
-
-function parseJadwalHeaderInfo(row) {
-  var hadirIndex = -1
-  var izinIndex = -1
-  var sakitIndex = -1
-  var dayColumns = []
-
-  for (var index = 0; index < row.length; index += 1) {
-    var normalized = normalizeKey(row[index])
-    if (normalized === 'hadir') hadirIndex = index
-    if (normalized === 'izin') izinIndex = index
-    if (normalized === 'sakit') sakitIndex = index
-  }
-
-  var summaryStart = [hadirIndex, izinIndex, sakitIndex]
-    .filter(function (value) {
-      return value >= 0
-    })
-    .sort(function (left, right) {
-      return left - right
-    })[0]
-
-  var dayEnd = summaryStart >= 0 ? summaryStart - 1 : row.length - 1
-  for (var col = 3; col <= dayEnd; col += 1) {
-    var dayText = normalizeText(row[col])
-    if (/^\d{1,2}$/.test(dayText)) {
-      dayColumns.push({ index: col, day: dayText })
-    }
-  }
-
-  return {
-    nameIndex: 0,
-    nikIndex: 1,
-    phoneIndex: 2,
-    hadirIndex: hadirIndex,
-    izinIndex: izinIndex,
-    sakitIndex: sakitIndex,
-    dayColumns: dayColumns,
-  }
-}
-
-function parseJadwalRows(spreadsheet, teamLookup) {
-  var jadwalSheetName = resolveExistingSheetName(spreadsheet, JADWAL_SHEET_CANDIDATES)
-  var bundle = getSheetBundle(spreadsheet, jadwalSheetName)
-  var rows = bundle.displayRows
-  var aliasLookup = buildTechnicianAliasLookup(teamLookup)
-  var items = []
-  var currentSection = { sto: '', month: '', year: '', label: '' }
-  var headerInfo = null
-
-  for (var rowIndex = 0; rowIndex < rows.length; rowIndex += 1) {
-    var row = rows[rowIndex]
-    var hasAnyValue = row.some(function (cell) {
-      return normalizeText(cell)
-    })
-    if (!hasAnyValue) {
-      continue
-    }
-
-    var firstCell = normalizeText(row[0])
-    var firstUpper = firstCell.toUpperCase()
-    if (firstUpper.indexOf('JADWAL ABSENSI TEKNISI') >= 0) {
-      currentSection = parseJadwalSectionMeta(firstCell)
-      headerInfo = null
-      continue
-    }
-
-    if (normalizeKey(firstCell) === 'nama_karyawan') {
-      headerInfo = parseJadwalHeaderInfo(row)
-      continue
-    }
-
-    if (!headerInfo) {
-      continue
-    }
-
-    var teknisi = normalizeText(row[headerInfo.nameIndex])
-    if (!teknisi) {
-      continue
-    }
-
-    var teamInfo = resolveTechnicianTeamInfo(teknisi, teamLookup, aliasLookup)
-    var hadir = headerInfo.hadirIndex >= 0 ? toNumber(row[headerInfo.hadirIndex]) : 0
-    var izin = headerInfo.izinIndex >= 0 ? toNumber(row[headerInfo.izinIndex]) : 0
-    var sakit = headerInfo.sakitIndex >= 0 ? toNumber(row[headerInfo.sakitIndex]) : 0
-
-    var jadwalEntries = []
-    headerInfo.dayColumns.forEach(function (column) {
-      var value = normalizeText(row[column.index])
-      if (value) {
-        jadwalEntries.push(column.day + ':' + value)
-      }
-    })
-
-    items.push({
-      sto: teamInfo ? teamInfo.sto : currentSection.sto,
-      team: teamInfo ? teamInfo.team : '',
-      teknisi: teknisi,
-      nik: normalizeText(row[headerInfo.nikIndex]) || null,
-      noHp: normalizeText(row[headerInfo.phoneIndex]) || null,
-      periode: currentSection.label,
-      bulan: currentSection.month,
-      tahun: currentSection.year,
-      hadir: hadir,
-      izin: izin,
-      sakit: sakit,
-      jadwal: jadwalEntries.join(', '),
-      statusKehadiran: '',
-      keterangan: null,
-    })
-  }
-
-  return items
-}
-
 function countMasterTechnicians(teamMasterRows, filters) {
   return countTechniciansNarindo(
     teamMasterRows.reduce(function (allRows, row) {
@@ -827,7 +686,6 @@ function loadSpreadsheetData() {
     }
   })
 
-  const jadwal = parseJadwalRows(spreadsheet, teamLookup)
 
   const imjas = mapSheetObjects(spreadsheet, 'IMJAS')
     .filter(function (row) {
@@ -890,7 +748,6 @@ function loadSpreadsheetData() {
     stoCommandCenter: stoCommandCenter,
     rankingTeams: rankingTeams,
     rankingTechnicians: rankingTechnicians,
-    jadwal: jadwal,
     imjas: imjas,
     unspec: unspec,
   }
@@ -1298,7 +1155,6 @@ function getHealthData() {
       rawTickets: data.rawTickets.length,
       teamMaster: data.teamMaster.length,
       teknisiNarindo: data.teknisiNarindo.length,
-      jadwal: data.jadwal.length,
       imjas: data.imjas.length,
       unspec: data.unspec.length,
     },
@@ -1337,11 +1193,6 @@ function getFilterOptions() {
           }),
         )
         .concat(
-          data.jadwal.map(function (item) {
-            return item.sto
-          }),
-        )
-        .concat(
           data.stoCommandCenter.map(function (item) {
             return item.sto
           }),
@@ -1371,11 +1222,6 @@ function getFilterOptions() {
         )
         .concat(
           data.teknisiNarindo.map(function (item) {
-            return item.team
-          }),
-        )
-        .concat(
-          data.jadwal.map(function (item) {
             return item.team
           }),
         )
@@ -1414,11 +1260,6 @@ function getFilterOptions() {
         )
         .concat(
           data.rankingTechnicians.map(function (item) {
-            return item.teknisi
-          }),
-        )
-        .concat(
-          data.jadwal.map(function (item) {
             return item.teknisi
           }),
         ),
@@ -1528,23 +1369,6 @@ function summarizeUnspec(items) {
   }
 }
 
-function summarizeJadwal(items) {
-  return {
-    totalRows: items.length,
-    totalTechnicians: items.length,
-    totalHadir: items.reduce(function (sum, item) {
-      return sum + toNumber(item.hadir)
-    }, 0),
-    totalIzin: items.reduce(function (sum, item) {
-      return sum + toNumber(item.izin)
-    }, 0),
-    totalSakit: items.reduce(function (sum, item) {
-      return sum + toNumber(item.sakit)
-    }, 0),
-    totalAlpha: 0,
-  }
-}
-
 function getImjasData(filters) {
   const data = loadSpreadsheetData()
   const items = filterByCommonFields(data.imjas, filters, ['sto', 'team'])
@@ -1559,15 +1383,6 @@ function getUnspecData(filters) {
   const items = filterByCommonFields(data.unspec, filters, ['sto', 'team', 'kendala'])
   return {
     summary: summarizeUnspec(items),
-    items: items,
-  }
-}
-
-function getJadwalData(filters) {
-  const data = loadSpreadsheetData()
-  const items = filterByCommonFields(data.jadwal, filters, ['sto', 'team', 'teknisi', 'tanggal', 'hari', 'shift', 'statusKehadiran', 'keterangan'])
-  return {
-    summary: summarizeJadwal(items),
     items: items,
   }
 }

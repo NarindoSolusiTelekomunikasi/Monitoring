@@ -78,7 +78,3 @@ export function getImjas(filters) {
 export function getUnspec(filters) {
   return fetchJson('/unspec', filters)
 }
-
-export function getJadwal(filters) {
-  return fetchJson('/jadwal', filters)
-}

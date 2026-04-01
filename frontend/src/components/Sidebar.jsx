@@ -4,7 +4,6 @@ import NarindoLogo from './NarindoLogo'
 const navItems = [
   { to: '/', label: 'Dashboard', end: true },
   { to: '/imjas', label: 'IMJAS' },
-  { to: '/jadwal', label: 'Jadwal' },
   { to: '/tickets', label: 'Tickets' },
   { to: '/teams', label: 'Teams' },
   { to: '/unspec', label: 'UNSPEC' },
