@@ -8,6 +8,7 @@ const SHEET_CONFIG = {
   TEKNISI_NARINDO: { headerRow: 0 },
   TEAM_PERFORMANCE: { headerRow: 0 },
   STO_COMMAND_CENTER: { headerRow: 0 },
+  JADWAL_KTU_SGB: { headerRow: 0 },
   RANKING_TEAM: { headerRow: 0 },
   RANKING_TEKNISI: { headerRow: 0 },
   IMJAS: { headerRow: 1 },
@@ -135,6 +136,30 @@ function readNumberFromRowByTokens(row, tokenGroups, fallbackValue) {
 function toNullableText(value) {
   const normalized = normalizeText(value)
   return normalized || null
+}
+
+function pickFirstText(row, keys) {
+  for (const key of keys) {
+    if (Object.prototype.hasOwnProperty.call(row, key)) {
+      const normalized = normalizeText(row[key])
+      if (normalized) {
+        return normalized
+      }
+    }
+  }
+  return ''
+}
+
+function normalizeAttendanceStatus(value) {
+  const normalized = normalizeText(value).toUpperCase()
+  if (!normalized) return ''
+  if (normalized.includes('HADIR') || normalized.includes('MASUK') || normalized === 'H') return 'HADIR'
+  if (normalized.includes('IZIN') || normalized === 'I') return 'IZIN'
+  if (normalized.includes('SAKIT') || normalized === 'S') return 'SAKIT'
+  if (normalized.includes('ALFA') || normalized.includes('ALPHA') || normalized === 'A') return 'ALPHA'
+  if (normalized.includes('CUTI') || normalized === 'C') return 'CUTI'
+  if (normalized.includes('LIBUR') || normalized.includes('OFF') || normalized === 'LIBUR' || normalized === 'L') return 'LIBUR'
+  return normalized
 }
 
 function normalizeStatus(value) {
@@ -435,6 +460,32 @@ async function loadWorkbookData() {
     totalClose: toNumber(row.total_close),
   }))
 
+  const jadwal = mapSheetObjects(workbook, 'JADWAL_KTU_SGB')
+    .filter((row) => row && Object.keys(row).some((key) => normalizeText(row[key])))
+    .map((row) => {
+      const sto = pickFirstText(row, ['sto', 'witel', 'witel_sto', 'area'])
+      const team = pickFirstText(row, ['team', 'nama_team', 'tim'])
+      const teknisi = pickFirstText(row, ['teknisi', 'nama_teknisi', 'nama', 'personil', 'karyawan'])
+      const tanggal = pickFirstText(row, ['tanggal', 'date', 'tgl', 'hari_tanggal'])
+      const hari = pickFirstText(row, ['hari'])
+      const shift = pickFirstText(row, ['shift', 'jadwal', 'jam_kerja'])
+      const statusKehadiran = normalizeAttendanceStatus(
+        pickFirstText(row, ['status', 'status_kehadiran', 'kehadiran', 'absen']),
+      )
+      const keterangan = pickFirstText(row, ['keterangan', 'ket', 'catatan', 'note'])
+
+      return {
+        sto,
+        team,
+        teknisi,
+        tanggal,
+        hari,
+        shift,
+        statusKehadiran,
+        keterangan: keterangan || null,
+      }
+    })
+
   const imjas = mapSheetObjects(workbook, 'IMJAS').map((row) => ({
     sto: normalizeText(row.sto),
     team: normalizeText(row.team),
@@ -485,6 +536,7 @@ async function loadWorkbookData() {
     stoCommandCenter,
     rankingTeams,
     rankingTechnicians,
+    jadwal,
     imjas,
     unspec,
   }
@@ -833,6 +885,7 @@ export async function getHealthData() {
       rawTickets: data.rawTickets.length,
       teamMaster: data.teamMaster.length,
       teknisiNarindo: data.teknisiNarindo.length,
+      jadwal: data.jadwal.length,
       imjas: data.imjas.length,
       unspec: data.unspec.length,
     },
@@ -853,6 +906,7 @@ export async function getFilterOptions() {
       ...data.rawTickets.map((ticket) => ticket.sto),
       ...data.teamMaster.map((item) => item.sto),
       ...data.teknisiNarindo.map((item) => item.sto),
+      ...data.jadwal.map((item) => item.sto),
       ...data.stoCommandCenter.map((item) => item.sto),
       ...data.imjas.map((item) => item.sto),
       ...data.unspec.map((item) => item.sto),
@@ -861,6 +915,7 @@ export async function getFilterOptions() {
       ...data.teamMaster.map((item) => item.nama_team),
       ...data.rawTickets.map((ticket) => ticket.team),
       ...data.teknisiNarindo.map((item) => item.team),
+      ...data.jadwal.map((item) => item.team),
       ...data.stoCommandCenter.map((item) => item.team),
       ...data.rankingTeams.map((item) => item.team),
       ...data.imjas.map((item) => item.team),
@@ -869,6 +924,7 @@ export async function getFilterOptions() {
     teknisis: collectUniqueValues([
       ...data.rawTickets.map((ticket) => ticket.teknisi),
       ...data.teknisiNarindo.map((item) => item.teknisi),
+      ...data.jadwal.map((item) => item.teknisi),
       ...data.rankingTechnicians.map((item) => item.teknisi),
     ]),
     statuses: STATUS_OPTIONS,
@@ -950,6 +1006,32 @@ function summarizeUnspec(items) {
   }
 }
 
+function summarizeJadwal(items) {
+  const summary = {
+    totalRows: items.length,
+    totalHadir: 0,
+    totalIzin: 0,
+    totalSakit: 0,
+    totalAlpha: 0,
+    totalCuti: 0,
+    totalLibur: 0,
+    totalOther: 0,
+  }
+
+  items.forEach((item) => {
+    const status = normalizeAttendanceStatus(item.statusKehadiran)
+    if (status === 'HADIR') summary.totalHadir += 1
+    else if (status === 'IZIN') summary.totalIzin += 1
+    else if (status === 'SAKIT') summary.totalSakit += 1
+    else if (status === 'ALPHA') summary.totalAlpha += 1
+    else if (status === 'CUTI') summary.totalCuti += 1
+    else if (status === 'LIBUR') summary.totalLibur += 1
+    else if (status) summary.totalOther += 1
+  })
+
+  return summary
+}
+
 export async function getImjasData(filters = {}) {
   const data = await loadWorkbookData()
   const items = filterByCommonFields(data.imjas, filters, ['sto', 'team'])
@@ -964,6 +1046,24 @@ export async function getUnspecData(filters = {}) {
   const items = filterByCommonFields(data.unspec, filters, ['sto', 'team', 'kendala'])
   return {
     summary: summarizeUnspec(items),
+    items,
+  }
+}
+
+export async function getJadwalData(filters = {}) {
+  const data = await loadWorkbookData()
+  const items = filterByCommonFields(data.jadwal, filters, [
+    'sto',
+    'team',
+    'teknisi',
+    'tanggal',
+    'hari',
+    'shift',
+    'statusKehadiran',
+    'keterangan',
+  ])
+  return {
+    summary: summarizeJadwal(items),
     items,
   }
 }

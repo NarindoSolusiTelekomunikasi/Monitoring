@@ -4,7 +4,7 @@ const CONFIG = {
     '1xKFr7vfaEltmSJu6UAodKBqk-fdST8I9vEU-fyC1xLM',
   cacheTtlSeconds: 60,
   filtersCacheTtlSeconds: 300,
-  cacheVersion: '2026-03-31-4',
+  cacheVersion: '2026-04-01-1',
 }
 
 const SHEET_CONFIG = {
@@ -15,6 +15,7 @@ const SHEET_CONFIG = {
   TEKNISI_NARINDO: { headerRow: 0 },
   TEAM_PERFORMANCE: { headerRow: 0 },
   STO_COMMAND_CENTER: { headerRow: 0 },
+  JADWAL_KTU_SGB: { headerRow: 0 },
   RANKING_TEAM: { headerRow: 0 },
   RANKING_TEKNISI: { headerRow: 0 },
   IMJAS: { headerRow: 1, detectHeader: true },
@@ -92,6 +93,9 @@ function doGet(e) {
       case 'unspec':
         payload = Object.assign({ filters: getFilterOptions() }, getUnspecData(filters))
         break
+      case 'jadwal':
+        payload = Object.assign({ filters: getFilterOptions() }, getJadwalData(filters))
+        break
       default:
         if (normalizedRoute.indexOf('tickets/') === 0) {
           const incidentId = route.split('/').slice(1).join('/')
@@ -134,7 +138,7 @@ function getFilters(e) {
 }
 
 function shouldUseRouteCache(route) {
-  return ['filters', 'dashboard', 'teams', 'rankings/teams', 'rankings/technicians', 'imjas', 'unspec'].indexOf(route) >= 0
+  return ['filters', 'dashboard', 'teams', 'rankings/teams', 'rankings/technicians', 'imjas', 'unspec', 'jadwal'].indexOf(route) >= 0
 }
 
 function getRouteCacheTtl(route) {
@@ -260,6 +264,31 @@ function readNumberFromRowByTokens(row, tokenGroups, fallbackValue) {
 function toNullableText(value) {
   const normalized = normalizeText(value)
   return normalized || null
+}
+
+function pickFirstText(row, keys) {
+  for (var index = 0; index < keys.length; index += 1) {
+    var key = keys[index]
+    if (Object.prototype.hasOwnProperty.call(row, key)) {
+      var normalized = normalizeText(row[key])
+      if (normalized) {
+        return normalized
+      }
+    }
+  }
+  return ''
+}
+
+function normalizeAttendanceStatus(value) {
+  var normalized = normalizeText(value).toUpperCase()
+  if (!normalized) return ''
+  if (normalized.indexOf('HADIR') >= 0 || normalized.indexOf('MASUK') >= 0 || normalized === 'H') return 'HADIR'
+  if (normalized.indexOf('IZIN') >= 0 || normalized === 'I') return 'IZIN'
+  if (normalized.indexOf('SAKIT') >= 0 || normalized === 'S') return 'SAKIT'
+  if (normalized.indexOf('ALFA') >= 0 || normalized.indexOf('ALPHA') >= 0 || normalized === 'A') return 'ALPHA'
+  if (normalized.indexOf('CUTI') >= 0 || normalized === 'C') return 'CUTI'
+  if (normalized.indexOf('LIBUR') >= 0 || normalized.indexOf('OFF') >= 0 || normalized === 'L') return 'LIBUR'
+  return normalized
 }
 
 function hasPrimaryFields(row, keys) {
@@ -613,6 +642,36 @@ function loadSpreadsheetData() {
     }
   })
 
+  const jadwal = mapSheetObjects(spreadsheet, 'JADWAL_KTU_SGB')
+    .filter(function (row) {
+      return row && Object.keys(row).some(function (key) {
+        return normalizeText(row[key])
+      })
+    })
+    .map(function (row) {
+      const sto = pickFirstText(row, ['sto', 'witel', 'witel_sto', 'area'])
+      const team = pickFirstText(row, ['team', 'nama_team', 'tim'])
+      const teknisi = pickFirstText(row, ['teknisi', 'nama_teknisi', 'nama', 'personil', 'karyawan'])
+      const tanggal = pickFirstText(row, ['tanggal', 'date', 'tgl', 'hari_tanggal'])
+      const hari = pickFirstText(row, ['hari'])
+      const shift = pickFirstText(row, ['shift', 'jadwal', 'jam_kerja'])
+      const statusKehadiran = normalizeAttendanceStatus(
+        pickFirstText(row, ['status', 'status_kehadiran', 'kehadiran', 'absen']),
+      )
+      const keterangan = pickFirstText(row, ['keterangan', 'ket', 'catatan', 'note'])
+
+      return {
+        sto: sto,
+        team: team,
+        teknisi: teknisi,
+        tanggal: tanggal,
+        hari: hari,
+        shift: shift,
+        statusKehadiran: statusKehadiran,
+        keterangan: keterangan || null,
+      }
+    })
+
   const imjas = mapSheetObjects(spreadsheet, 'IMJAS')
     .filter(function (row) {
       return hasPrimaryFields(row, ['sto', 'team'])
@@ -674,6 +733,7 @@ function loadSpreadsheetData() {
     stoCommandCenter: stoCommandCenter,
     rankingTeams: rankingTeams,
     rankingTechnicians: rankingTechnicians,
+    jadwal: jadwal,
     imjas: imjas,
     unspec: unspec,
   }
@@ -1081,6 +1141,7 @@ function getHealthData() {
       rawTickets: data.rawTickets.length,
       teamMaster: data.teamMaster.length,
       teknisiNarindo: data.teknisiNarindo.length,
+      jadwal: data.jadwal.length,
       imjas: data.imjas.length,
       unspec: data.unspec.length,
     },
@@ -1119,6 +1180,11 @@ function getFilterOptions() {
           }),
         )
         .concat(
+          data.jadwal.map(function (item) {
+            return item.sto
+          }),
+        )
+        .concat(
           data.stoCommandCenter.map(function (item) {
             return item.sto
           }),
@@ -1148,6 +1214,11 @@ function getFilterOptions() {
         )
         .concat(
           data.teknisiNarindo.map(function (item) {
+            return item.team
+          }),
+        )
+        .concat(
+          data.jadwal.map(function (item) {
             return item.team
           }),
         )
@@ -1186,6 +1257,11 @@ function getFilterOptions() {
         )
         .concat(
           data.rankingTechnicians.map(function (item) {
+            return item.teknisi
+          }),
+        )
+        .concat(
+          data.jadwal.map(function (item) {
             return item.teknisi
           }),
         ),
@@ -1295,6 +1371,32 @@ function summarizeUnspec(items) {
   }
 }
 
+function summarizeJadwal(items) {
+  var summary = {
+    totalRows: items.length,
+    totalHadir: 0,
+    totalIzin: 0,
+    totalSakit: 0,
+    totalAlpha: 0,
+    totalCuti: 0,
+    totalLibur: 0,
+    totalOther: 0,
+  }
+
+  items.forEach(function (item) {
+    var status = normalizeAttendanceStatus(item.statusKehadiran)
+    if (status === 'HADIR') summary.totalHadir += 1
+    else if (status === 'IZIN') summary.totalIzin += 1
+    else if (status === 'SAKIT') summary.totalSakit += 1
+    else if (status === 'ALPHA') summary.totalAlpha += 1
+    else if (status === 'CUTI') summary.totalCuti += 1
+    else if (status === 'LIBUR') summary.totalLibur += 1
+    else if (status) summary.totalOther += 1
+  })
+
+  return summary
+}
+
 function getImjasData(filters) {
   const data = loadSpreadsheetData()
   const items = filterByCommonFields(data.imjas, filters, ['sto', 'team'])
@@ -1309,6 +1411,15 @@ function getUnspecData(filters) {
   const items = filterByCommonFields(data.unspec, filters, ['sto', 'team', 'kendala'])
   return {
     summary: summarizeUnspec(items),
+    items: items,
+  }
+}
+
+function getJadwalData(filters) {
+  const data = loadSpreadsheetData()
+  const items = filterByCommonFields(data.jadwal, filters, ['sto', 'team', 'teknisi', 'tanggal', 'hari', 'shift', 'statusKehadiran', 'keterangan'])
+  return {
+    summary: summarizeJadwal(items),
     items: items,
   }
 }

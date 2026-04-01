@@ -6,6 +6,7 @@ import {
   getFilterOptions,
   getHealthData,
   getImjasData,
+  getJadwalData,
   getRankedTeams,
   getRankedTechnicians,
   getTeamData,
@@ -142,6 +143,14 @@ app.get(
   handleRequest(async (req) => ({
     filters: await getFilterOptions(),
     ...(await getUnspecData(req.query)),
+  })),
+)
+
+app.get(
+  '/api/jadwal',
+  handleRequest(async (req) => ({
+    filters: await getFilterOptions(),
+    ...(await getJadwalData(req.query)),
   })),
 )
 

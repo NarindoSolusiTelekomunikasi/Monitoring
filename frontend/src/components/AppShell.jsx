@@ -24,6 +24,10 @@ const pageMeta = {
     title: 'Imjas',
     description: 'Monitoring IMJAS per STO dan team..',
   },
+  '/jadwal': {
+    title: 'Jadwal Kehadiran',
+    description: 'Monitoring jadwal kehadiran teknisi dari sheet JADWAL KTU SGB.',
+  },
   '/unspec': {
     title: 'Unspec',
     description: 'Monitoring UNSPEC per STO dan team',
